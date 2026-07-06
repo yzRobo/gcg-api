@@ -79,6 +79,7 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | `set_code`, `card_type`, `color`, `rarity` | string | exact (`set_code`/`card_type` case-insensitive) |
 | `level`, `cost`, `ap`, `hp` | integer | exact |
 | `name`, `effect` | string | substring (case-insensitive) |
+| `keyword` | string | has a keyword ability / timing marker, e.g. `Blocker`, `Repair`, `Burst` (case-insensitive) |
 | `limit` | integer | page size, 1–250 (default 100) |
 | `offset` | integer | page offset (default 0) |
 
@@ -111,6 +112,13 @@ List responses wrap results as `{ "_meta": { total, limit, offset, count, discla
 | `effect` | string | card text; newlines preserved |
 | `image_url` | string | absolute `gundam-gcg.com` URL — **not** rehosted here |
 | `detail_url` | string \| null | source detail page |
+| `keyword_effects` | array | keyword abilities parsed from `effect`, e.g. `[{"keyword":"Repair","value":1}]` |
+| `timing_markers` | array | effect timing tokens, e.g. `["Burst","Main"]` |
+| `traits` | array | trait tags, e.g. `["Earth Federation","White Base Team"]` |
+| `link_refs` | array | link references (`[pilot]` names / `(trait)` conditions) |
+| `keywords_text` | string \| null | denormalized text backing the `keyword` filter |
+| `ap_raw`, `hp_raw` | string \| null | raw stat strings; preserve PILOT `+1`/`+2` modifiers that `ap`/`hp` drop |
+| `where_to_get` | string \| null | product/event this printing came from (unique for promos) |
 
 ---
 

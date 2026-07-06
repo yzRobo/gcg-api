@@ -41,6 +41,11 @@ async function main() {
   // Card-type-aware: UNITs must have AP/HP; only assert on the fields a type actually has.
   const unitsMissingStats = cards.filter(c => /UNIT/i.test(c.card_type) && !/TOKEN/i.test(c.card_type) && (c.ap == null || c.hp == null)).length;
   if (unitsMissingStats > cards.length * 0.05) throw new Error(`SANITY: ${unitsMissingStats} UNITs missing AP/HP — stat labels likely changed`);
+  // M5: structured keyword/timing extraction must be producing data (guards a silent effect-selector break).
+  const cardsWithKeywords = cards.filter(c => (c.keyword_effects && c.keyword_effects.length) || (c.timing_markers && c.timing_markers.length)).length;
+  if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) — effect parsing likely broke`);
+  const badTypeSep = cards.filter(c => /[・･]/.test(c.card_type)).length;
+  if (badTypeSep > 0) throw new Error(`SANITY: ${badTypeSep} cards still have a fullwidth-dot card_type separator — normalizeType broke`);
   console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets`);
 
   // ---- Write artifacts ----

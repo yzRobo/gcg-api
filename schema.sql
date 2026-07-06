@@ -23,7 +23,17 @@ CREATE TABLE IF NOT EXISTS cards (
   sp           TEXT,
   effect       TEXT,
   image_url    TEXT,
-  detail_url   TEXT
+  detail_url   TEXT,
+  -- M5 structured/provenance fields (see src/normalize.js). JSON-array columns are stored as
+  -- TEXT and JSON.parse()d by the Worker before returning (hydrate()).
+  ap_raw          TEXT,   -- preserves PILOT "+1"/"+2" modifiers (ap/hp coerce and drop the sign)
+  hp_raw          TEXT,
+  where_to_get    TEXT,   -- product/event provenance (unique for promo printings)
+  traits          TEXT,   -- JSON array, e.g. ["Earth Federation","White Base Team"]
+  link_refs       TEXT,   -- JSON array of [pilot]/(trait) link references
+  keyword_effects TEXT,   -- JSON array of { keyword, value } from <...>
+  timing_markers  TEXT,   -- JSON array of timing tokens from 【...】
+  keywords_text   TEXT    -- denormalized lowercase keyword+timing text, for LIKE filtering
 );
 CREATE INDEX IF NOT EXISTS idx_cards_set    ON cards(set_code);
 CREATE INDEX IF NOT EXISTS idx_cards_type   ON cards(card_type);

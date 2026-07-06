@@ -2,13 +2,15 @@
 const fs = require('fs');
 const path = require('path');
 const cards = fs.readFileSync(path.join(__dirname,'..','data','cards.ndjson'),'utf8').trim().split('\n').map(JSON.parse);
-const cols = ['product_id','card_number','name','set_code','set_name','rarity','card_type','color','level','cost','ap','hp','zone','trait','link','source_title','block_icon','sp','effect','image_url','detail_url'];
+const cols = ['product_id','card_number','name','set_code','set_name','rarity','card_type','color','level','cost','ap','hp','zone','trait','link','source_title','block_icon','sp','effect','image_url','detail_url','ap_raw','hp_raw','where_to_get','traits','link_refs','keyword_effects','timing_markers','keywords_text'];
+const JSON_COLS = new Set(['traits','link_refs','keyword_effects','timing_markers']); // stored as JSON-in-TEXT
+const cell = (c, k) => JSON_COLS.has(k) ? JSON.stringify(c[k] || []) : c[k];
 const esc = (v) => v == null ? 'NULL' : (typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g,"''")}'`);
 let sql = 'DELETE FROM cards;\n';
-for (let i = 0; i < cards.length; i += 50) {                     // 50 rows per INSERT — D1 caps a single SQL statement at ~100 KB and long effect texts add up
-  const chunk = cards.slice(i, i + 50);
+for (let i = 0; i < cards.length; i += 40) {                     // 40 rows per INSERT — D1 caps a single SQL statement at ~100 KB; effect + new JSON columns add up
+  const chunk = cards.slice(i, i + 40);
   sql += `INSERT INTO cards (${cols.join(',')}) VALUES\n` +
-    chunk.map(c => `(${cols.map(k => esc(c[k])).join(',')})`).join(',\n') + ';\n';
+    chunk.map(c => `(${cols.map(k => esc(cell(c, k))).join(',')})`).join(',\n') + ';\n';
 }
 // Precomputed summaries so /v1/manifest and /v1/sets are O(1) meta reads instead of
 // full-table COUNT/GROUP BY scans on every cache miss (D1 free-tier read-budget guard).

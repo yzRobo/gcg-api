@@ -51,6 +51,16 @@ files to remove.
 7. **CI reachability.** GitHub-hosted runners use shared cloud IPs some sites block. Verified
    working as of the first run; if a future run 403s from CI but works locally, the fallback is
    to scrape locally + commit, and let the Action do only the D1 sync + Worker deploy.
+8. **M5 structured extraction is coupled to effect-text formatting.** `keyword_effects` comes
+   from ASCII angle brackets `<...>`; `timing_markers` from fullwidth lenticular brackets `【...】`
+   split on BOTH middle-dot code points (U+30FB `・` and U+FF65 `･`); `traits`/`link_refs` from
+   `(...)`/`[...]` groups. The `cli.js` sanity gate asserts >=30% of cards carry keyword/timing
+   data, so a formatting change fails loudly. Known source quirk: GD02-053 renders `[Suppression]`
+   in square brackets (a typo) instead of `<Suppression>`, so that one mention is not captured as
+   a keyword — leave it; do not loosen the regex to square brackets (square brackets are used for
+   pilot-name links and would produce false keyword hits). JSON-array columns (`keyword_effects`,
+   `timing_markers`, `traits`, `link_refs`) are stored as TEXT and MUST be `JSON.parse`d by the
+   Worker's `hydrate()` before returning, since every card route does `SELECT *`.
 
 ## Operations
 

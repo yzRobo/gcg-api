@@ -19,7 +19,16 @@ const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '
 
 // Only these query params affect a response body; the cache key is built from them
 // (sorted) so junk params like ?_=<rand> cannot mint unlimited cache misses.
-const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'limit', 'offset'];
+const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'limit', 'offset'];
+
+// JSON-in-TEXT columns are stored as strings in D1; parse them back to arrays before returning,
+// since every card route does SELECT * and returns rows verbatim.
+const JSON_COLS = ['traits', 'link_refs', 'keyword_effects', 'timing_markers'];
+function hydrate(row) {
+  if (!row) return row;
+  for (const k of JSON_COLS) if (typeof row[k] === 'string') { try { row[k] = JSON.parse(row[k]); } catch (_) { /* leave as-is */ } }
+  return row;
+}
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -359,7 +368,7 @@ async function route(url, env, version) {
   let m;
   if ((m = p.match(/^\/v1\/sets\/([^/]+)\/cards$/))) {
     const { results } = await env.DB.prepare(`SELECT * FROM cards WHERE set_code = ?1 ORDER BY card_number`).bind(m[1].toUpperCase()).all();
-    return json({ _meta: { disclaimer: DISCLAIMER, count: results.length }, data: results });
+    return json({ _meta: { disclaimer: DISCLAIMER, count: results.length }, data: results.map(hydrate) });
   }
 
   if ((m = p.match(/^\/v1\/cards\/([^/]+)$/))) {
@@ -369,7 +378,7 @@ async function route(url, env, version) {
     // A card_number match returns the base printing (GD01-001 sorts before GD01-001_p1).
     let row = await env.DB.prepare(`SELECT * FROM cards WHERE product_id = ?1 LIMIT 1`).bind(id).first();
     if (!row) row = await env.DB.prepare(`SELECT * FROM cards WHERE card_number = ?1 ORDER BY product_id LIMIT 1`).bind(id).first();
-    return row ? json({ _meta: { disclaimer: DISCLAIMER }, data: row }) : json({ error: 'Not found' }, 404);
+    return row ? json({ _meta: { disclaimer: DISCLAIMER }, data: hydrate(row) }) : json({ error: 'Not found' }, 404);
   }
 
   if (p === '/v1/cards') {
@@ -385,6 +394,8 @@ async function route(url, env, version) {
     // substring search
     if (q.get('name')) { binds.push(`%${q.get('name')}%`); where.push(`name LIKE ?${binds.length}`); }
     if (q.get('effect')) { binds.push(`%${q.get('effect')}%`); where.push(`effect LIKE ?${binds.length}`); }
+    // keyword ability / timing marker (matches the denormalized keywords_text, case-insensitive)
+    if (q.get('keyword')) { binds.push(`%${q.get('keyword').toLowerCase()}%`); where.push(`keywords_text LIKE ?${binds.length}`); }
 
     const limit = Math.min(Math.max(parseInt(q.get('limit') || '100', 10) || 100, 1), 250); // clamp to >=1: in SQLite a negative LIMIT means "no limit"
     const offset = Math.min(Math.max(parseInt(q.get('offset') || '0', 10) || 0, 0), 1000000); // upper clamp: a huge offset would overflow i64 -> 500
@@ -394,7 +405,7 @@ async function route(url, env, version) {
       ? (await env.DB.prepare(`SELECT COUNT(*) AS n FROM cards ${clause}`).bind(...binds).first()).n
       : await cardCount(env);
     const { results } = await env.DB.prepare(`SELECT * FROM cards ${clause} ORDER BY card_number LIMIT ${limit} OFFSET ${offset}`).bind(...binds).all();
-    return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results });
+    return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results.map(hydrate) });
   }
 
   return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
@@ -424,7 +435,15 @@ const CARD_SCHEMA = {
     sp: { type: ['string', 'null'] },
     effect: { type: 'string', description: 'Card text; newlines preserved.' },
     image_url: { type: 'string', description: 'Absolute gundam-gcg.com URL. NOT rehosted by this project.' },
-    detail_url: { type: ['string', 'null'] }
+    detail_url: { type: ['string', 'null'] },
+    ap_raw: { type: ['string', 'null'], description: 'Raw AP string; preserves PILOT "+1"/"+2" modifiers.' },
+    hp_raw: { type: ['string', 'null'], description: 'Raw HP string; preserves PILOT modifiers.' },
+    where_to_get: { type: ['string', 'null'], description: 'Product/event this printing came from (unique for promos).' },
+    traits: { type: 'array', items: { type: 'string' }, description: 'Trait tags, e.g. ["Earth Federation","White Base Team"].' },
+    link_refs: { type: 'array', items: { type: 'string' }, description: 'Link references ([pilot] names / (trait) conditions).' },
+    keyword_effects: { type: 'array', items: { type: 'object', properties: { keyword: { type: 'string' }, value: { type: ['integer', 'null'] } } }, description: 'Keyword abilities parsed from effect text, e.g. [{keyword:"Repair",value:1}].' },
+    timing_markers: { type: 'array', items: { type: 'string' }, description: 'Effect timing tokens, e.g. ["Burst","Main"].' },
+    keywords_text: { type: ['string', 'null'], description: 'Denormalized lowercase keyword+timing text used by the ?keyword= filter.' }
   }
 };
 
@@ -439,7 +458,8 @@ function openapiSpec(url) {
     ['ap', 'integer', 'Exact AP.'],
     ['hp', 'integer', 'Exact HP.'],
     ['name', 'string', 'Case-insensitive substring match on name.'],
-    ['effect', 'string', 'Case-insensitive substring match on effect text.']
+    ['effect', 'string', 'Case-insensitive substring match on effect text.'],
+    ['keyword', 'string', 'Cards with a given keyword ability or timing marker (e.g. Blocker, Repair, Burst). Case-insensitive.']
   ].map(([name, type, description]) => ({ name, in: 'query', required: false, schema: { type }, description }));
   cardFilters.push({ name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 100, minimum: 1, maximum: 250 }, description: 'Page size (clamped 1-250).' });
   cardFilters.push({ name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0, minimum: 0, maximum: 1000000 }, description: 'Page offset.' });
@@ -563,6 +583,7 @@ function docsPage(url) {
     <tr><td>set_code, card_type, color, rarity</td><td>string</td><td>exact (set_code/card_type case-insensitive)</td></tr>
     <tr><td>level, cost, ap, hp</td><td>integer</td><td>exact</td></tr>
     <tr><td>name, effect</td><td>string</td><td>substring (case-insensitive)</td></tr>
+    <tr><td>keyword</td><td>string</td><td>has a keyword ability / timing marker (e.g. Blocker, Repair, Burst)</td></tr>
     <tr><td>limit</td><td>integer</td><td>page size, 1-250 (default 100)</td></tr>
     <tr><td>offset</td><td>integer</td><td>page offset (default 0)</td></tr>
   </table>
@@ -594,6 +615,13 @@ curl "${base}/v1/cards?limit=250" -H "X-API-Key: gcd_your_key_here"</pre>
     <tr><td>effect</td><td>string</td><td>Card text; newlines preserved</td></tr>
     <tr><td>image_url</td><td>string</td><td>Absolute gundam-gcg.com URL. Images are NOT rehosted here.</td></tr>
     <tr><td>detail_url</td><td>string | null</td><td>Source detail page</td></tr>
+    <tr><td>keyword_effects</td><td>array</td><td>keyword abilities from effect text, e.g. [{keyword:"Repair",value:1}]</td></tr>
+    <tr><td>timing_markers</td><td>array</td><td>effect timing tokens, e.g. ["Burst","Main"]</td></tr>
+    <tr><td>traits</td><td>array</td><td>trait tags, e.g. ["Earth Federation"]</td></tr>
+    <tr><td>link_refs</td><td>array</td><td>link references ([pilot] / (trait))</td></tr>
+    <tr><td>keywords_text</td><td>string | null</td><td>denormalized text backing the <code>keyword</code> filter</td></tr>
+    <tr><td>ap_raw, hp_raw</td><td>string | null</td><td>raw stat strings; preserve PILOT "+1" modifiers</td></tr>
+    <tr><td>where_to_get</td><td>string | null</td><td>product/event provenance (unique for promos)</td></tr>
   </table>
 
   <h2>Bulk download</h2>
