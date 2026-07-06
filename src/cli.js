@@ -19,6 +19,7 @@ async function main() {
   console.log(`Found ${packages.length} packages`);
 
   const byId = new Map();
+  const rulingsByKey = new Map();
   const setIndex = [];
   for (const pkg of packages) {
     const raw = await scraper.scrapePackage(pkg, {
@@ -28,11 +29,16 @@ async function main() {
     let count = 0;
     for (const rc of raw) {
       if (rc.product_id && !byId.has(rc.product_id)) { byId.set(rc.product_id, normalizeCard(rc, pkg)); count++; }
+      for (const r of (rc.rulings || [])) {                       // link-only rulings, deduped per card_number
+        const key = `${rc.card_number}|${r.num}`;
+        if (!rulingsByKey.has(key)) rulingsByKey.set(key, { card_number: rc.card_number, num: r.num, date: r.date, question: r.question, source_url: rc.detail_url });
+      }
     }
     setIndex.push({ set_code: pkg.code || null, set_name: pkg.name.replace(/\s*\[[^\]]*\]\s*$/, '').trim(), card_count: count });
   }
 
   const cards = [...byId.values()];
+  const rulings = [...rulingsByKey.values()];
 
   // ---- SANITY GATE (abort before writing anything if these fail) ----
   if (cards.length < 1000) throw new Error(`SANITY: only ${cards.length} cards (<1000) — probable scrape failure`);
@@ -46,7 +52,7 @@ async function main() {
   if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) — effect parsing likely broke`);
   const badTypeSep = cards.filter(c => /[・･]/.test(c.card_type)).length;
   if (badTypeSep > 0) throw new Error(`SANITY: ${badTypeSep} cards still have a fullwidth-dot card_type separator — normalizeType broke`);
-  console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets`);
+  console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets, ${rulings.length} rulings`);
 
   // ---- Write artifacts ----
   fs.mkdirSync(path.join(OUT, 'cards', 'en'), { recursive: true });
@@ -62,6 +68,8 @@ async function main() {
   for (const [k, list] of Object.entries(bySet)) fs.writeFileSync(path.join(OUT, 'cards', 'en', `${k}.json`), JSON.stringify(list, null, 0));
   // Sets index
   fs.writeFileSync(path.join(OUT, 'sets', 'en', 'index.json'), JSON.stringify(setIndex, null, 2));
+  // Rulings (link-only: num/date/question + source_url; NOT the answer text)
+  fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
   // Manifest (consumers read this FIRST — never hardcode file URLs)
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
     schema_version: 1,
@@ -69,7 +77,8 @@ async function main() {
     built_at: new Date().toISOString(),
     card_count: cards.length,
     set_count: setIndex.length,
-    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json' },
+    ruling_count: rulings.length,
+    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json' },
     disclaimer: 'Not affiliated with Bandai. Gundam and card images are copyright Bandai.'
   }, null, 2));
 

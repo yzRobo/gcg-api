@@ -19,7 +19,7 @@ const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '
 
 // Only these query params affect a response body; the cache key is built from them
 // (sorted) so junk params like ?_=<rand> cannot mint unlimited cache misses.
-const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'limit', 'offset'];
+const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'limit', 'offset', 'include'];
 
 // JSON-in-TEXT columns are stored as strings in D1; parse them back to arrays before returning,
 // since every card route does SELECT * and returns rows verbatim.
@@ -378,7 +378,14 @@ async function route(url, env, version) {
     // A card_number match returns the base printing (GD01-001 sorts before GD01-001_p1).
     let row = await env.DB.prepare(`SELECT * FROM cards WHERE product_id = ?1 LIMIT 1`).bind(id).first();
     if (!row) row = await env.DB.prepare(`SELECT * FROM cards WHERE card_number = ?1 ORDER BY product_id LIMIT 1`).bind(id).first();
-    return row ? json({ _meta: { disclaimer: DISCLAIMER }, data: hydrate(row) }) : json({ error: 'Not found' }, 404);
+    if (!row) return json({ error: 'Not found' }, 404);
+    const card = hydrate(row);
+    if ((url.searchParams.get('include') || '').split(',').map((s) => s.trim()).includes('rulings')) {
+      // Link-only official rulings for this card_number (num/date/question + source_url; no answer prose).
+      const { results } = await env.DB.prepare(`SELECT num, date, question, source_url FROM rulings WHERE card_number = ?1 ORDER BY num`).bind(card.card_number).all();
+      card.rulings = results;
+    }
+    return json({ _meta: { disclaimer: DISCLAIMER }, data: card });
   }
 
   if (p === '/v1/cards') {
@@ -484,7 +491,10 @@ function openapiSpec(url) {
       '/v1/cards/{id}': {
         get: {
           tags: ['cards'], summary: 'Get one card by product_id or card_number',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'product_id (e.g. GD01-001_p1) or card_number (e.g. GD01-001; returns the base printing).' }],
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'product_id (e.g. GD01-001_p1) or card_number (e.g. GD01-001; returns the base printing).' },
+            { name: 'include', in: 'query', required: false, schema: { type: 'string', enum: ['rulings'] }, description: 'Comma-separated extras. "rulings" attaches the card\'s official FAQ rulings (link-only: number, date, question + source_url; the answer prose is not reproduced).' }
+          ],
           responses: { '200': { description: 'The card' }, '404': { description: 'Not found' } }
         }
       },
@@ -569,7 +579,7 @@ function docsPage(url) {
   <table>
     <tr><th>Method / Path</th><th>Description</th></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards</code></td><td>List/filter cards. Query params below.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing). Add <code>?include=rulings</code> for official FAQ rulings (link-only).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, bulk URL.</td></tr>

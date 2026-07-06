@@ -62,3 +62,15 @@ CREATE TABLE IF NOT EXISTS api_keys (
   revoked         INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_ip ON api_keys(created_ip_hash);
+
+-- Official per-card FAQ rulings (M5). LINK-ONLY posture: number, date, and question text,
+-- plus source_url back to the official page — the answer prose (Bandai copyright) is NOT stored.
+-- Replaced wholesale by each import (like cards); exposed via /v1/cards/:id?include=rulings.
+CREATE TABLE IF NOT EXISTS rulings (
+  card_number TEXT,
+  num         TEXT,
+  date        TEXT,
+  question    TEXT,
+  source_url  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rulings_card ON rulings(card_number);

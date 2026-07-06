@@ -65,7 +65,7 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | Method / Path | Description |
 |---|---|
 | `GET /v1/cards` | List/filter cards (query params below) |
-| `GET /v1/cards/{id}` | One card by `product_id` or `card_number` (a `card_number` returns the base printing) |
+| `GET /v1/cards/{id}` | One card by `product_id` or `card_number` (a `card_number` returns the base printing). Add `?include=rulings` for the card's official FAQ rulings (link-only: number/date/question + source link) |
 | `GET /v1/sets` | All sets with card counts |
 | `GET /v1/sets/{code}/cards` | All cards in a set, e.g. `GD01` |
 | `GET /v1/manifest` | Dataset version, card count, bulk URL |

@@ -44,5 +44,15 @@ const metaRows = [
 for (const [k, v] of metaRows) {
   sql += `INSERT INTO meta (key,value) VALUES ('${k}',${esc(v)}) ON CONFLICT(key) DO UPDATE SET value=excluded.value;\n`;
 }
+// Rulings table (separate; link-only rulings, replaced wholesale each run).
+const rulingsPath = path.join(__dirname,'..','data','rulings.json');
+const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsPath,'utf8')) : [];
+const rcols = ['card_number','num','date','question','source_url'];
+sql += 'DELETE FROM rulings;\n';
+for (let i = 0; i < rulings.length; i += 100) {
+  const chunk = rulings.slice(i, i + 100);
+  sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +
+    chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
+}
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
-console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets)`);
+console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings)`);

@@ -104,6 +104,17 @@ class GundamScraper {
       if (label) fields[label] = value;
     });
 
+    // FAQ / rulings block on the same page. Link-only per project posture: capture the
+    // number, date, and question (short, identifying), but NOT the answer prose (Bandai
+    // copyright) — consumers follow detail_url to the official answer.
+    const rulings = [];
+    $('.cardQaCol .qaCol').each((i, el) => {
+      const num = $(el).find('.qaColNum').text().replace(/\s+/g, ' ').trim();
+      const date = $(el).find('.qaColDate').text().replace(/\s+/g, ' ').replace(/\s*Updated\s*$/i, '').trim();
+      const question = $(el).find('.qaColQuestion').text().replace(/\s+/g, ' ').trim();
+      if (num || question) rulings.push({ num, date, question });
+    });
+
     return {
       product_id: productId,
       card_number: $('.cardNoCol .cardNo').text().trim() || productId,
@@ -116,7 +127,8 @@ class GundamScraper {
       fields,
       source_package: pkg.name,
       set_code: pkg.code || (productId.split('-')[0] || '').toUpperCase(),
-      detail_url: link
+      detail_url: link,
+      rulings
     };
   }
 

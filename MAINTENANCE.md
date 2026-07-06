@@ -61,6 +61,14 @@ files to remove.
    pilot-name links and would produce false keyword hits). JSON-array columns (`keyword_effects`,
    `timing_markers`, `traits`, `link_refs`) are stored as TEXT and MUST be `JSON.parse`d by the
    Worker's `hydrate()` before returning, since every card route does `SELECT *`.
+9. **Rulings are LINK-ONLY by policy.** `scraper.js` parses the per-card FAQ block
+   (`.cardQaCol .qaCol` -> `.qaColNum`/`.qaColDate`/`.qaColQuestion`) and stores only the
+   number, date, question, and `source_url` (the detail page) in the separate `rulings` table
+   (keyed by card_number, deduped across printings) -> exposed via `/v1/cards/:id?include=rulings`.
+   The ANSWER prose (`.qaColAnswer`) is deliberately NOT stored (Bandai copyright); consumers
+   follow source_url for the official answer. Do not start storing answers without a deliberate
+   copyright-posture change. Rulings exist on only ~a quarter of cards, so a low count is normal
+   (not a scrape failure).
 
 ## Operations
 

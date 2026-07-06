@@ -51,3 +51,4 @@ jobs:
             data/cards.ndjson
             data/cards.json
             data/manifest.json
+            data/rulings.json
