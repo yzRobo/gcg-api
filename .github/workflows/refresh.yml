@@ -1,0 +1,53 @@
+name: refresh-gundam-data
+on:
+  schedule:
+    - cron: '0 6 * * 1'      # every Monday 06:00 UTC
+  workflow_dispatch: {}       # manual trigger button
+permissions:
+  contents: write             # REQUIRED: new repos default GITHUB_TOKEN to read-only, which would 403 the data commit and the Release publish
+concurrency:
+  group: refresh              # never let a manual run overlap the cron run
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm ci           # requires package-lock.json to be committed (run npm install locally once and commit the lockfile)
+      - name: Scrape + build artifacts (fails loudly on sanity error)
+        run: node src/cli.js
+        env:
+          DATASET_VERSION: ${{ github.run_number }}-${{ github.sha }}
+      - name: Generate D1 import SQL
+        run: node scripts/gen-sql.js
+        env:
+          DATASET_VERSION: ${{ github.run_number }}-${{ github.sha }}
+      - name: Push data into D1
+        run: npx wrangler d1 execute gundam-cards --remote --file ../data/import.sql -y
+        working-directory: worker   # picks up worker/wrangler.toml; npx resolves wrangler from the root node_modules
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy Worker with new DATASET_VERSION (busts edge cache)
+        run: npx wrangler deploy --var DATASET_VERSION:${{ github.run_number }}-${{ github.sha }}
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Commit refreshed data files
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git add data/
+          git commit -m "data: weekly refresh (run ${{ github.run_number }})" || echo "no changes to commit"
+          git push
+      - name: Publish rolling Release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: data-latest
+          files: |
+            data/cards.ndjson
+            data/cards.json
+            data/manifest.json

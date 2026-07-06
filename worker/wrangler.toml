@@ -1,0 +1,50 @@
+name = "gcg-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Custom domain on the gcgapi.com zone. Serving off a real zone (not *.workers.dev)
+# also activates the edge Cache API. wrangler provisions the domain + TLS cert on deploy.
+routes = [
+  { pattern = "api.gcgapi.com", custom_domain = true }
+]
+
+[vars]
+DATASET_VERSION = "2026-07-06"          # manual seed; the M3 refresh job overrides per publish
+# Rolling Release asset — replaced on every publish, so always current.
+# Do NOT use jsDelivr @latest here: it only resolves semver tags, and our tag (data-latest) is not semver.
+BULK_URL = "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.ndjson"
+# Cloudflare Turnstile SITE key (public; safe to commit). This default is Cloudflare's
+# "always passes" TESTING sitekey — replace with the real one after creating the widget
+# in the dashboard (Part 10 setup). The matching SECRET is set via `wrangler secret put
+# TURNSTILE_SECRET` (never committed).
+TURNSTILE_SITEKEY = "0x4AAAAAADw6vR6JSEjXAD_i"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gundam-cards"
+database_id = "89d177f8-0ca9-41f5-b916-44adcef25224"
+
+# Workers Rate Limiting bindings (GA Sep 2025; requires wrangler >= 4.36).
+# Counters are node-local (no network hop, no D1 cost). period must be 10 or 60.
+# Anonymous tier: 60 requests / minute / IP.
+[[ratelimits]]
+name = "RL_ANON"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
+# Keyed tier: 300 requests / minute / API key.
+[[ratelimits]]
+name = "RL_KEYED"
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 300
+  period = 60
+
+# Secrets (NOT here — set via `wrangler secret put`). BOTH are REQUIRED for /register
+# and POST /v1/keys to work; without them key registration returns HTTP 501 (fails closed):
+#   TURNSTILE_SECRET  — Turnstile secret key (server-side siteverify)
+#   IP_HASH_SALT      — random >=32-byte pepper for hashing CF-Connecting-IP before storage.
+#                       Without it, stored created_ip_hash would be reversible to the raw IP,
+#                       so registration refuses to persist without it.

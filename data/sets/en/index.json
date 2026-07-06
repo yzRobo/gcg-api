@@ -1,0 +1,97 @@
+[
+  {
+    "set_code": "GD01",
+    "set_name": "Newtype Rising",
+    "card_count": 179
+  },
+  {
+    "set_code": "GD02",
+    "set_name": "Dual Impact",
+    "card_count": 187
+  },
+  {
+    "set_code": "GD03",
+    "set_name": "Steel Requiem",
+    "card_count": 202
+  },
+  {
+    "set_code": "GD04",
+    "set_name": "Phantom Aria",
+    "card_count": 194
+  },
+  {
+    "set_code": "ST01",
+    "set_name": "Heroic Beginnings",
+    "card_count": 35
+  },
+  {
+    "set_code": "ST02",
+    "set_name": "Wings of Advance",
+    "card_count": 34
+  },
+  {
+    "set_code": "ST03",
+    "set_name": "Zeon's Rush",
+    "card_count": 34
+  },
+  {
+    "set_code": "ST04",
+    "set_name": "SEED Strike",
+    "card_count": 35
+  },
+  {
+    "set_code": "ST05",
+    "set_name": "Iron Bloom",
+    "card_count": 32
+  },
+  {
+    "set_code": "ST06",
+    "set_name": "Clan Unity",
+    "card_count": 32
+  },
+  {
+    "set_code": "ST07",
+    "set_name": "Celestial Drive",
+    "card_count": 32
+  },
+  {
+    "set_code": "ST08",
+    "set_name": "Flash of Radiance",
+    "card_count": 32
+  },
+  {
+    "set_code": "ST09",
+    "set_name": "Destiny Ignition",
+    "card_count": 39
+  },
+  {
+    "set_code": "ST10",
+    "set_name": "Generation Pulse",
+    "card_count": 35
+  },
+  {
+    "set_code": "EB01",
+    "set_name": "Eternal Nexus",
+    "card_count": 108
+  },
+  {
+    "set_code": null,
+    "set_name": "Other Product Card",
+    "card_count": 54
+  },
+  {
+    "set_code": null,
+    "set_name": "Edition Beta",
+    "card_count": 83
+  },
+  {
+    "set_code": null,
+    "set_name": "Basic Cards",
+    "card_count": 3
+  },
+  {
+    "set_code": null,
+    "set_name": "Promotion card",
+    "card_count": 179
+  }
+]
