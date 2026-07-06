@@ -84,7 +84,7 @@ async function enforceRateLimit(env, actor) {
 function normalizedQuery(url) {
   const sp = url.searchParams;
   const parts = [];
-  for (const k of CACHE_PARAMS) if (sp.has(k)) parts.push(`${k}=${sp.get(k)}`);
+  for (const k of CACHE_PARAMS) if (sp.has(k)) parts.push(`${k}=${encodeURIComponent(sp.get(k))}`); // encode so decoded values can't collide across different param splits (cache-key poisoning fix)
   parts.sort();
   return parts.join('&');
 }
