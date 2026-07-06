@@ -316,8 +316,22 @@ async function route(url, env, version) {
 
   if (p === '/' || p === '/health') {
     const limiterOk = !!(env.RL_ANON && typeof env.RL_ANON.limit === 'function' && env.RL_KEYED && typeof env.RL_KEYED.limit === 'function');
-    return json({ ok: true, service: 'gundam-card-data', version, rate_limiter: limiterOk ? 'active' : 'fail-open (binding missing)', disclaimer: DISCLAIMER });
+    return json({
+      ok: true,
+      service: 'gcg-api',
+      description: 'Free, unofficial Gundam Card Game data API.',
+      version,
+      rate_limiter: limiterOk ? 'active' : 'fail-open (binding missing)',
+      docs: `${url.origin}/docs`,
+      openapi: `${url.origin}/openapi.json`,
+      register: `${url.origin}/register`,
+      repository: 'https://github.com/yzRobo/gcg-api',
+      disclaimer: DISCLAIMER
+    });
   }
+
+  if (p === '/docs') return docsPage(url);
+  if (p === '/openapi.json') return json(openapiSpec(url));
 
   if (p === '/v1/manifest') {
     return json({ dataset_version: version, card_count: await cardCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
@@ -383,7 +397,218 @@ async function route(url, env, version) {
     return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results });
   }
 
-  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/register'] }, 404);
+  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
+}
+
+// ---- OpenAPI 3 spec (served at /openapi.json). Kept in sync with route() by hand. ----
+const CARD_SCHEMA = {
+  type: 'object',
+  properties: {
+    product_id: { type: 'string', description: 'Natural key; unique per printing. Alt-arts get a _p1/_p2 suffix (e.g. GD01-001_p1).' },
+    card_number: { type: 'string', description: 'e.g. GD01-001. Shared across alt-art printings.' },
+    name: { type: 'string' },
+    set_code: { type: 'string', description: 'e.g. GD01, ST01, EB01.' },
+    set_name: { type: 'string' },
+    rarity: { type: 'string' },
+    card_type: { type: 'string', description: 'UNIT, PILOT, COMMAND, BASE, RESOURCE, plus token/EX variants.' },
+    color: { type: ['string', 'null'], description: 'Blue/Green/Red/White/Purple; null = colorless.' },
+    level: { type: ['integer', 'null'] },
+    cost: { type: ['integer', 'null'] },
+    ap: { type: ['integer', 'null'], description: 'Attack. Present on UNITs.' },
+    hp: { type: ['integer', 'null'] },
+    zone: { type: ['string', 'null'] },
+    trait: { type: ['string', 'null'] },
+    link: { type: ['string', 'null'] },
+    source_title: { type: ['string', 'null'] },
+    block_icon: { type: ['string', 'null'] },
+    sp: { type: ['string', 'null'] },
+    effect: { type: 'string', description: 'Card text; newlines preserved.' },
+    image_url: { type: 'string', description: 'Absolute gundam-gcg.com URL. NOT rehosted by this project.' },
+    detail_url: { type: ['string', 'null'] }
+  }
+};
+
+function openapiSpec(url) {
+  const cardFilters = [
+    ['set_code', 'string', 'Exact set code, e.g. GD01 (case-insensitive).'],
+    ['card_type', 'string', 'Exact card type, e.g. UNIT (case-insensitive).'],
+    ['color', 'string', 'Exact color, e.g. Blue.'],
+    ['rarity', 'string', 'Exact rarity code.'],
+    ['level', 'integer', 'Exact level.'],
+    ['cost', 'integer', 'Exact cost.'],
+    ['ap', 'integer', 'Exact AP.'],
+    ['hp', 'integer', 'Exact HP.'],
+    ['name', 'string', 'Case-insensitive substring match on name.'],
+    ['effect', 'string', 'Case-insensitive substring match on effect text.']
+  ].map(([name, type, description]) => ({ name, in: 'query', required: false, schema: { type }, description }));
+  cardFilters.push({ name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 100, minimum: 1, maximum: 250 }, description: 'Page size (clamped 1-250).' });
+  cardFilters.push({ name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0, minimum: 0, maximum: 1000000 }, description: 'Page offset.' });
+
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'gcg-api',
+      version: '1',
+      description: 'Free, unofficial read-only REST API for Gundam Card Game data. Not affiliated with Bandai. ' + DISCLAIMER,
+      license: { name: 'MIT (code) / CC0-1.0 (data compilation)', url: 'https://github.com/yzRobo/gcg-api' }
+    },
+    servers: [{ url: url.origin }],
+    tags: [{ name: 'cards' }, { name: 'sets' }, { name: 'meta' }, { name: 'keys' }],
+    paths: {
+      '/v1/cards': {
+        get: {
+          tags: ['cards'], summary: 'List/filter cards', parameters: cardFilters,
+          responses: { '200': { description: 'Matching cards with pagination metadata' } }
+        }
+      },
+      '/v1/cards/{id}': {
+        get: {
+          tags: ['cards'], summary: 'Get one card by product_id or card_number',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'product_id (e.g. GD01-001_p1) or card_number (e.g. GD01-001; returns the base printing).' }],
+          responses: { '200': { description: 'The card' }, '404': { description: 'Not found' } }
+        }
+      },
+      '/v1/sets': {
+        get: { tags: ['sets'], summary: 'List sets with card counts', responses: { '200': { description: 'Sets' } } }
+      },
+      '/v1/sets/{code}/cards': {
+        get: {
+          tags: ['sets'], summary: 'All cards in a set',
+          parameters: [{ name: 'code', in: 'path', required: true, schema: { type: 'string' }, description: 'Set code, e.g. GD01.' }],
+          responses: { '200': { description: 'Cards in the set' } }
+        }
+      },
+      '/v1/manifest': {
+        get: { tags: ['meta'], summary: 'Dataset version, card count, bulk URL', responses: { '200': { description: 'Manifest' } } }
+      },
+      '/v1/bulk': {
+        get: { tags: ['meta'], summary: 'Redirect (302) to the full NDJSON dataset on the GitHub Release', responses: { '302': { description: 'Redirect to the bulk file' } } }
+      },
+      '/register': {
+        get: { tags: ['keys'], summary: 'HTML page to self-register a free API key (Cloudflare Turnstile challenge)', responses: { '200': { description: 'HTML registration page' } } }
+      },
+      '/v1/keys': {
+        post: {
+          tags: ['keys'],
+          summary: 'Issue a free API key. Requires a valid Cloudflare Turnstile token (obtained via /register in a browser).',
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string', description: 'Turnstile response token.' }, label: { type: 'string', description: 'Optional label.' } } } } } },
+          responses: { '201': { description: 'Key issued (shown once)' }, '400': { description: 'Missing token / bad body' }, '403': { description: 'Turnstile failed or per-IP key cap reached' }, '429': { description: 'Rate limited' }, '501': { description: 'Registration not configured' } }
+        }
+      }
+    },
+    components: {
+      schemas: { Card: CARD_SCHEMA },
+      securitySchemes: { ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Optional. Raises the rate limit from ~60 to ~300 requests/minute.' } }
+    }
+  };
+}
+
+function docsPage(url) {
+  const base = url.origin;
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gcg-api - Gundam Card Game data API</title>
+<style>
+  :root { color-scheme: light dark; --border: #8883; --muted: #8889; --accent: #3a7; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem 4rem; line-height: 1.55; }
+  h1 { font-size: 1.7rem; margin-bottom: .2rem; }
+  h2 { font-size: 1.25rem; margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: .3rem; }
+  h3 { font-size: 1rem; margin-top: 1.4rem; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code { background: #8882; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+  pre { background: #8881; border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; font-size: .85rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: .5rem 0; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--border); padding: .35rem .55rem; text-align: left; vertical-align: top; }
+  th { background: #8882; }
+  .muted { color: var(--muted); }
+  .pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: .1rem .4rem; border-radius: 4px; background: var(--accent); color: #000; margin-right: .4rem; }
+  .note { border-left: 3px solid var(--accent); padding: .5rem .9rem; margin: 1rem 0; background: #3a71; border-radius: 0 6px 6px 0; }
+  .disclaimer { font-size: .82rem; color: var(--muted); margin-top: 2.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+  <h1>gcg-api</h1>
+  <p class="muted">Free, unofficial read-only REST API and downloadable dataset for the Gundam Card Game.</p>
+  <p>Base URL: <code>${base}</code> &nbsp;|&nbsp; <a href="${base}/openapi.json">OpenAPI spec</a> &nbsp;|&nbsp; <a href="https://github.com/yzRobo/gcg-api">GitHub</a></p>
+
+  <div class="note">The card data files are the source of truth; this API is a convenience layer over them. For the whole dataset, download the bulk file (see below) rather than paging the API.</div>
+
+  <h2>Rate limits &amp; keys</h2>
+  <ul>
+    <li><b>Keyless</b>: up to ~60 requests/minute per IP. No signup.</li>
+    <li><b>Free key</b>: up to ~300 requests/minute. Get one at <a href="${base}/register">/register</a> and send it as the <code>X-API-Key</code> header.</li>
+  </ul>
+  <p class="muted">Limits are enforced per Cloudflare location, so they are approximate ceilings. Over the limit returns <code>429</code> with a <code>Retry-After</code> header.</p>
+
+  <h2>Endpoints</h2>
+  <table>
+    <tr><th>Method / Path</th><th>Description</th></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/cards</code></td><td>List/filter cards. Query params below.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, bulk URL.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
+  </table>
+
+  <h3>/v1/cards query parameters</h3>
+  <table>
+    <tr><th>Param</th><th>Type</th><th>Match</th></tr>
+    <tr><td>set_code, card_type, color, rarity</td><td>string</td><td>exact (set_code/card_type case-insensitive)</td></tr>
+    <tr><td>level, cost, ap, hp</td><td>integer</td><td>exact</td></tr>
+    <tr><td>name, effect</td><td>string</td><td>substring (case-insensitive)</td></tr>
+    <tr><td>limit</td><td>integer</td><td>page size, 1-250 (default 100)</td></tr>
+    <tr><td>offset</td><td>integer</td><td>page offset (default 0)</td></tr>
+  </table>
+
+  <h3>Examples</h3>
+  <pre>curl "${base}/v1/cards?color=Blue&amp;card_type=UNIT&amp;limit=5"
+curl "${base}/v1/cards?name=Gundam&amp;cost=3"
+curl "${base}/v1/cards/GD01-001"
+curl "${base}/v1/sets"
+curl "${base}/v1/sets/GD01/cards"
+curl "${base}/v1/manifest"
+
+# with a free key (higher rate limit)
+curl "${base}/v1/cards?limit=250" -H "X-API-Key: gcd_your_key_here"</pre>
+
+  <h2>Card schema</h2>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>product_id</td><td>string</td><td>Natural key; unique per printing (alt-arts get _p1/_p2)</td></tr>
+    <tr><td>card_number</td><td>string</td><td>e.g. GD01-001 (shared by alt-arts)</td></tr>
+    <tr><td>name</td><td>string</td><td></td></tr>
+    <tr><td>set_code</td><td>string</td><td>e.g. GD01, ST01, EB01</td></tr>
+    <tr><td>set_name</td><td>string</td><td></td></tr>
+    <tr><td>rarity</td><td>string</td><td></td></tr>
+    <tr><td>card_type</td><td>string</td><td>UNIT, PILOT, COMMAND, BASE, RESOURCE, + token/EX variants</td></tr>
+    <tr><td>color</td><td>string | null</td><td>Blue/Green/Red/White/Purple; null = colorless</td></tr>
+    <tr><td>level, cost, ap, hp</td><td>integer | null</td><td>numeric stats</td></tr>
+    <tr><td>zone, trait, link, source_title, block_icon, sp</td><td>string | null</td><td>optional fields</td></tr>
+    <tr><td>effect</td><td>string</td><td>Card text; newlines preserved</td></tr>
+    <tr><td>image_url</td><td>string</td><td>Absolute gundam-gcg.com URL. Images are NOT rehosted here.</td></tr>
+    <tr><td>detail_url</td><td>string | null</td><td>Source detail page</td></tr>
+  </table>
+
+  <h2>Bulk download</h2>
+  <p>The full dataset is a single newline-delimited JSON file, always current, on the GitHub Release:</p>
+  <pre>curl -L "${base}/v1/bulk" -o cards.ndjson</pre>
+
+  <h2>License &amp; attribution</h2>
+  <p>Code: <b>MIT</b>. Data compilation (factual fields only): <b>CC0-1.0</b>. Neither grants any rights in Bandai's card names, effect text, artwork, or trademarks.</p>
+  <p class="muted">Data scraped from the official site <a href="https://www.gundam-gcg.com/en/cards">gundam-gcg.com</a>. Community prior art: <a href="https://exburst.dev">ExBurst</a>, <a href="https://egmanevents.com">EGMAN Events</a>.</p>
+  <p>Issues, corrections, or takedown requests: <a href="https://github.com/yzRobo/gcg-api/issues">GitHub Issues</a>.</p>
+
+  <p class="disclaimer">${DISCLAIMER} This project is not produced by, endorsed by, supported by, or affiliated with Bandai.</p>
+</body>
+</html>`;
+  return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', ...CORS } });
 }
 
 // Static card count served from the meta table (written by the weekly import); falls back

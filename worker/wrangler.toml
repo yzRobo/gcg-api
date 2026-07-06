@@ -9,7 +9,7 @@ routes = [
 ]
 
 [vars]
-DATASET_VERSION = "2026-07-06"          # manual seed; the M3 refresh job overrides per publish
+DATASET_VERSION = "2026-07-06.3"        # manual seed; the M3 refresh job overrides per publish
 # Rolling Release asset — replaced on every publish, so always current.
 # Do NOT use jsDelivr @latest here: it only resolves semver tags, and our tag (data-latest) is not semver.
 BULK_URL = "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.ndjson"
