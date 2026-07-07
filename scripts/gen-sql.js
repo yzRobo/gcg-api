@@ -36,17 +36,18 @@ const setsSummary = [...setMap.values()].map(s => {
   }
   return { set_code: s.set_code, set_name: best == null ? '' : best, card_count: s.card_count };
 }).sort((a, b) => a.set_code < b.set_code ? -1 : a.set_code > b.set_code ? 1 : 0);
+const rulingsPath = path.join(__dirname,'..','data','rulings.json');
+const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsPath,'utf8')) : [];
 const metaRows = [
   ['dataset_version', process.env.DATASET_VERSION || new Date().toISOString().slice(0,10)],
   ['card_count', String(cards.length)],
+  ['ruling_count', String(rulings.length)],
   ['sets_summary', JSON.stringify(setsSummary)]
 ];
 for (const [k, v] of metaRows) {
   sql += `INSERT INTO meta (key,value) VALUES ('${k}',${esc(v)}) ON CONFLICT(key) DO UPDATE SET value=excluded.value;\n`;
 }
-// Rulings table (separate; link-only rulings, replaced wholesale each run).
-const rulingsPath = path.join(__dirname,'..','data','rulings.json');
-const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsPath,'utf8')) : [];
+// Rulings table (separate; link-only rulings, replaced wholesale each run). rulings loaded above.
 const rcols = ['card_number','num','date','question','source_url'];
 sql += 'DELETE FROM rulings;\n';
 for (let i = 0; i < rulings.length; i += 100) {

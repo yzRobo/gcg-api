@@ -343,7 +343,7 @@ async function route(url, env, version) {
   if (p === '/openapi.json') return json(openapiSpec(url));
 
   if (p === '/v1/manifest') {
-    return json({ dataset_version: version, card_count: await cardCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
   }
 
   // Redirect bulk downloads to the rolling Release asset — no Worker compute.
@@ -656,5 +656,14 @@ async function cardCount(env) {
   const n = row ? parseInt(row.value, 10) : NaN;
   if (!Number.isNaN(n)) return n;
   const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM cards`).first();
+  return c ? c.n : 0;
+}
+
+// Static ruling count from meta (written by the weekly import); falls back to COUNT(*).
+async function rulingCount(env) {
+  const row = await env.DB.prepare(`SELECT value FROM meta WHERE key = 'ruling_count'`).first();
+  const n = row ? parseInt(row.value, 10) : NaN;
+  if (!Number.isNaN(n)) return n;
+  const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM rulings`).first();
   return c ? c.n : 0;
 }
