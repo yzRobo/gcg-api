@@ -79,6 +79,24 @@ files to remove.
   `npm run gen-sql` and `wrangler d1 execute gundam-cards --remote --file data/import.sql -y`,
   and `cd worker && wrangler deploy --var DATASET_VERSION:<new-value>` to sync + bust cache.
 
+### Products data (supplementary)
+- Products are SUPPLEMENTARY: a products scrape failure never aborts the card refresh (try/catch
+  in `cli.js`), and two guards protect the committed `data/products.json` from a bad scrape:
+  - **Zero-guard**: a 0-product scrape keeps the existing file (a selector break must not wipe it).
+  - **Shrink-guard**: a scrape that is >25% smaller than the committed file (`new < existing*0.75`)
+    keeps the existing file. This defends against a truncated/"pager-collapsed" sweep that looks
+    complete (e.g. the pager markup breaks so only page 1's ~12 items are fetched, all unique).
+- The official products list has UNSTABLE pagination (tied release dates shuffle at a page
+  boundary), so the scraper sweeps up to 5x and takes the first duplicate-free sweep (or the union
+  as a fallback). Any guard trigger / union fallback / skipped list item is promoted to a GitHub
+  `::warning::` annotation on the run summary (the run still goes green - products never fail it).
+- **Recovery after a LEGITIMATE mass-delisting.** If Bandai genuinely removes many products, the
+  shrink-guard will hold the old file every week (warning each run) instead of shrinking. To accept
+  the new smaller set: delete `data/products.json` on `main` (commit the deletion), then run the
+  workflow. With no committed baseline the shrink-guard cannot fire, so the run writes the fresh
+  (smaller) set and commits it. (A normal delisting of one or two products is under the 25%
+  threshold and flows through automatically.)
+
 ### Config vs secrets
 - Config lives in `worker/wrangler.toml` `[vars]`: `DATASET_VERSION`, `BULK_URL`,
   `TURNSTILE_SITEKEY` (public), plus the `[[ratelimits]]` bindings and the `api.gcgapi.com`

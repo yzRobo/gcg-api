@@ -18,9 +18,15 @@ jobs:
       - run: npm ci           # requires package-lock.json to be committed (run npm install locally once and commit the lockfile)
       - name: Scrape + build artifacts (fails loudly on sanity error)
         # tee the build log so the next step can surface product-data degradation as annotations.
-        # GitHub's default bash runs with `set -eo pipefail`, so a non-zero node exit still fails
-        # the step (the sanity gate keeps its loud-fail behavior) even through the pipe.
-        run: node src/cli.js 2>&1 | tee "$RUNNER_TEMP/build.log"
+        # CRITICAL: `shell: bash` + explicit `set -o pipefail` is REQUIRED here. A run step with NO
+        # shell key runs `bash -e {0}` (errexit but NO pipefail), so `node ... | tee` would exit with
+        # tee's 0 and a sanity-gate failure would go GREEN and silently re-publish stale data. Only
+        # `shell: bash` gives `bash --noprofile --norc -eo pipefail {0}`; set -o pipefail is belt-and-
+        # braces. This keeps the "fails loudly" guarantee intact through the pipe.
+        shell: bash
+        run: |
+          set -o pipefail
+          node src/cli.js 2>&1 | tee "$RUNNER_TEMP/build.log"
         env:
           DATASET_VERSION: ${{ github.run_number }}-${{ github.sha }}
       - name: Surface product-data degradation on the run summary
