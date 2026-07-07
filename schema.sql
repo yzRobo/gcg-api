@@ -74,3 +74,13 @@ CREATE TABLE IF NOT EXISTS rulings (
   source_url  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_rulings_card ON rulings(card_number);
+
+-- Per-key daily usage counters (M5+ /v1/me). Incremented fire-and-forget on KEYED requests
+-- only (anonymous traffic is never tracked: privacy + trivial D1 write volume). NEVER rewritten
+-- by the weekly import (same rule as api_keys); gen-sql only appends a 35-day prune.
+CREATE TABLE IF NOT EXISTS usage_daily (
+  key_hash TEXT NOT NULL,
+  day      TEXT NOT NULL,           -- UTC date, YYYY-MM-DD
+  count    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (key_hash, day)
+);

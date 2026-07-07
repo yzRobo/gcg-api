@@ -67,7 +67,7 @@ async function identify(request, env) {
     try {
       const keyHash = await sha256Hex(presented);
       const row = await env.DB.prepare('SELECT revoked FROM api_keys WHERE key_hash = ?1').bind(keyHash).first();
-      if (row && !row.revoked) return { tier: 'keyed', rlKey: `k:${keyHash}` };
+      if (row && !row.revoked) return { tier: 'keyed', rlKey: `k:${keyHash}`, keyHash };
     } catch (_) { /* fall through to anonymous */ }
   }
   return { tier: 'anon', rlKey: `ip:${await ipHash(request, env)}` };
@@ -120,9 +120,18 @@ export default {
       }, 429, { 'Retry-After': '60', 'Cache-Control': 'no-store' }); // 429s carry Retry-After and are never cached
     }
 
-    // ---- Self-serve key registration (never cached) ----
+    // Per-key daily usage counter — keyed requests only (anonymous traffic is never tracked).
+    // Fire-and-forget: adds no latency, silently undercounts if the D1 write budget is ever hit.
+    if (actor.tier === 'keyed' && actor.keyHash) {
+      ctx.waitUntil(env.DB.prepare(
+        "INSERT INTO usage_daily (key_hash, day, count) VALUES (?1, date('now'), 1) ON CONFLICT(key_hash, day) DO UPDATE SET count = count + 1"
+      ).bind(actor.keyHash).run().catch(() => {}));
+    }
+
+    // ---- Per-key + registration endpoints handled BEFORE the cache (responses must never be cached) ----
     if (url.pathname === '/register' && request.method === 'GET') return registerPage(env);
     if (url.pathname === '/v1/keys' && request.method === 'POST') return createKey(request, env);
+    if (url.pathname === '/v1/me' && request.method === 'GET') return meHandler(request, env, url);
 
     if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
@@ -226,6 +235,42 @@ async function createKey(request, env) {
     usage: 'Send this key in the "X-API-Key" request header. Store it now — it is shown only once and cannot be recovered.',
     note: `Anonymous access (no key) is limited to about ${ANON_LIMIT} requests/minute per IP (enforced per Cloudflare location). For bulk data, download the Release files instead of paging the API.`
   }, 201);
+}
+
+// ---- /v1/me: per-key status + usage. Handled before the cache and sent no-store, because
+// per-key data must never enter the shared edge cache (one caller's usage served to another). ----
+async function meHandler(request, env, url) {
+  const noStore = { 'Cache-Control': 'no-store' };
+  const presented = request.headers.get('X-API-Key');
+  let keyRow = null, keyHash = null;
+  if (presented) {
+    try {
+      keyHash = await sha256Hex(presented);
+      keyRow = await env.DB.prepare('SELECT label, created_at, revoked FROM api_keys WHERE key_hash = ?1').bind(keyHash).first();
+    } catch (_) { keyRow = null; }
+  }
+  if (!keyRow) {
+    return json({ tier: 'anon', limit_per_minute: ANON_LIMIT, register: `${url.origin}/register` }, 200, noStore);
+  }
+  let usage = { today: 0, last_7_days: 0, last_30_days: 0 };
+  try {
+    const u = await env.DB.prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN day = date('now') THEN count END), 0) AS today,
+         COALESCE(SUM(CASE WHEN day >= date('now','-6 day') THEN count END), 0) AS last_7_days,
+         COALESCE(SUM(CASE WHEN day >= date('now','-29 day') THEN count END), 0) AS last_30_days
+       FROM usage_daily WHERE key_hash = ?1`
+    ).bind(keyHash).first();
+    if (u) usage = { today: u.today, last_7_days: u.last_7_days, last_30_days: u.last_30_days };
+  } catch (_) { /* usage is best-effort */ }
+  const revoked = !!keyRow.revoked;
+  return json({
+    tier: 'keyed',
+    limit_per_minute: revoked ? ANON_LIMIT : KEYED_LIMIT,   // a revoked key falls back to anonymous limits
+    key: { label: keyRow.label, created_at: keyRow.created_at, revoked },
+    usage,
+    note: 'Per-minute remaining is not queryable; limits are approximate per Cloudflare location.'
+  }, 200, noStore);
 }
 
 // ---- /register: self-contained HTML with a Turnstile widget (its script is the only external dep) ----
@@ -415,7 +460,7 @@ async function route(url, env, version) {
     return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results.map(hydrate) });
   }
 
-  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
+  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
 }
 
 // ---- OpenAPI 3 spec (served at /openapi.json). Kept in sync with route() by hand. ----
@@ -511,6 +556,9 @@ function openapiSpec(url) {
       '/v1/manifest': {
         get: { tags: ['meta'], summary: 'Dataset version, card count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
+      '/v1/me': {
+        get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key; response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
+      },
       '/v1/bulk': {
         get: { tags: ['meta'], summary: 'Redirect (302) to the full NDJSON dataset on the GitHub Release', responses: { '302': { description: 'Redirect to the bulk file' } } }
       },
@@ -585,6 +633,7 @@ function docsPage(url) {
     <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, bulk URL.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
     <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/me</code></td><td>Your key status, tier, limit, and usage today/7d/30d (send <code>X-API-Key</code>; never cached).</td></tr>
   </table>
 
   <h3>/v1/cards query parameters</h3>

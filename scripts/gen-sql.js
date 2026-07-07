@@ -55,5 +55,8 @@ for (let i = 0; i < rulings.length; i += 100) {
   sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +
     chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
 }
+// Prune per-key usage counters older than 35 days (usage_daily is otherwise never touched by
+// the import — like api_keys — so keys and their history persist across weekly refreshes).
+sql += "DELETE FROM usage_daily WHERE day < date('now','-35 day');\n";
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
 console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings)`);

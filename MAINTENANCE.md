@@ -97,8 +97,15 @@ files to remove.
 - Tiers: keyless ~60/min (`RL_ANON`, by IP), keyed ~300/min (`RL_KEYED`, by key hash). Invalid/
   revoked/unknown keys fall back to anonymous limits (never 401). Limits are per-Cloudflare-colo
   (node-local counters) by design — approximate global ceilings, an accepted free-tier tradeoff.
-- The `api_keys` table is **never** touched by the weekly import (`import.sql` only rewrites
-  `cards` + `meta`), so keys persist across refreshes.
+- The `api_keys` table is **never** rewritten by the weekly import, so keys persist across
+  refreshes. (`import.sql` rewrites `cards`, `meta`, and `rulings`; it only PRUNES `usage_daily`.)
+- **Usage / `/v1/me`.** `usage_daily` (key_hash, day, count) is incremented fire-and-forget on
+  KEYED requests only — anonymous traffic is never tracked (privacy + keeps D1 writes tiny). It
+  is undercount-tolerant (a dropped write is a courtesy-dashboard miss, not billing) and pruned
+  to 35 days by gen-sql. `/v1/me` is handled BEFORE the edge cache and sent `Cache-Control:
+  no-store` — per-key data must never enter the shared cache (one caller's usage served to
+  another). Per-minute remaining is intentionally not exposed (the rate-limit binding has no
+  readable counter, and a per-minute figure resets before it is actionable).
 
 ### Abuse response
 Revoke a specific key without deleting the row:

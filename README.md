@@ -71,6 +71,7 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | `GET /v1/manifest` | Dataset version, card count, bulk URL |
 | `GET /v1/bulk` | 302 redirect to the full NDJSON dataset |
 | `GET /register` | Self-serve free API key page |
+| `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) — send `X-API-Key`; never cached |
 
 `GET /v1/cards` query parameters (combine freely):
 
