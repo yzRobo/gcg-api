@@ -148,28 +148,54 @@ function normalizeProduct(listItem, detail) {
   };
 }
 
-// Scrape all products. Returns [] if nothing found (caller applies the zero-guard).
-async function scrapeProducts(options = {}) {
-  const batchSize = options.batchSize || 3;
-  const batchDelay = options.batchDelay != null ? options.batchDelay : 400;
-  const listDelay = options.listDelay != null ? options.listDelay : 400;
-
+// One full sweep of the paginated products list -> array of list items (a single sweep may
+// include a cross-page duplicate or be missing a boundary item; the caller unions by product_id).
+async function sweepListPages(listDelay) {
   const first = await fetchWithRetry(() => axios.get(listUrl(1), { headers: HEADERS, timeout: 30000 }));
   const totalPages = Math.min(parseTotalPages(first.data) || 1, 20); // defensive cap
-  let listItems = parseListPage(first.data);
+  let items = parseListPage(first.data);
   for (let page = 2; page <= totalPages; page++) {
     await delay(listDelay);
     const resp = await fetchWithRetry(() => axios.get(listUrl(page), { headers: HEADERS, timeout: 30000 }));
     const pageItems = parseListPage(resp.data);
     if (pageItems.length === 0) break; // stop when a page yields nothing (defensive)
-    listItems = listItems.concat(pageItems);
+    items = items.concat(pageItems);
   }
+  return items;
+}
 
-  // Dedupe by product_id (keep first seen).
+// Scrape all products. Returns [] if nothing found (caller applies the zero-guard).
+async function scrapeProducts(options = {}) {
+  const batchSize = options.batchSize || 3;
+  const batchDelay = options.batchDelay != null ? options.batchDelay : 400;
+  const listDelay = options.listDelay != null ? options.listDelay : 400;
+  const maxSweeps = options.maxSweeps != null ? options.maxSweeps : 5;
+
+  // The official products list has UNSTABLE pagination: products with tied release dates shuffle
+  // at the page-2/page-3 boundary between requests, so a single sweep intermittently DUPLICATES
+  // one item across the seam and DROPS an adjacent one - observed live 2026-07-07, count
+  // oscillating 39/40. Within one sweep a cross-page duplicate therefore ALWAYS coincides with a
+  // dropped item, whereas a duplicate-free sweep is necessarily the COMPLETE set (a genuine
+  // delisting is also duplicate-free, so this never invents a product). Sweep until we get a
+  // clean (duplicate-free) sweep - that snapshot is authoritative; also UNION every sweep so the
+  // best-effort fallback (no clean sweep within maxSweeps) still recovers items dropped in some
+  // sweeps but present in others.
   const byId = new Map();
-  for (const it of listItems) if (!byId.has(it.product_id)) byId.set(it.product_id, it);
+  let sweepsDone = 0, sawCleanSweep = false;
+  while (sweepsDone < maxSweeps) {
+    if (sweepsDone > 0) await delay(listDelay);
+    const swept = await sweepListPages(listDelay);
+    const uniqueInSweep = new Set(swept.map(it => it.product_id));
+    const clean = uniqueInSweep.size === swept.length; // no cross-page dup -> nothing was dropped
+    let added = 0;
+    for (const it of swept) if (it.product_id && !byId.has(it.product_id)) { byId.set(it.product_id, it); added++; }
+    sweepsDone++;
+    console.log(`Products: list sweep ${sweepsDone} -> ${swept.length} entries, ${uniqueInSweep.size} unique${clean ? ' (clean)' : ' (has a cross-page dup; a boundary item was dropped)'}, ${added} new (union now ${byId.size})`);
+    if (clean) { sawCleanSweep = true; break; } // a duplicate-free sweep IS the complete set
+  }
+  if (!sawCleanSweep) console.warn(`WARNING: no duplicate-free products list sweep after ${sweepsDone} tries; using the union of ${byId.size} (source pagination stayed unstable).`);
   const items = [...byId.values()];
-  console.log(`Products: ${items.length} items across ${totalPages} list page(s); fetching detail pages`);
+  console.log(`Products: ${items.length} unique products across ${sweepsDone} list sweep(s)${sawCleanSweep ? ' (clean)' : ' (union fallback)'}; fetching detail pages`);
 
   const products = [];
   for (let i = 0; i < items.length; i += batchSize) {
