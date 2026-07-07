@@ -85,12 +85,13 @@ function parseTotalPages(html) {
 function parseListPage(html) {
   const $ = cheerio.load(html);
   const items = [];
+  const skipped = [];
   $('.productsDetail').each((i, el) => {
     const $el = $(el);
     const a = $el.find('a.productsDetailInner').first();
     const product_url = (a.attr('href') || '').trim();
     const product_id = slugFromUrl(product_url);
-    if (!product_id) return;
+    if (!product_id) { skipped.push(product_url || '(no href)'); return; } // non-.html link or missing href - surfaced below instead of vanishing silently
     let listDate = null, listMsrp = null;
     $el.find('.cardInfo dt').each((j, dt) => {
       const label = clean($(dt).text()).toLowerCase();
@@ -109,6 +110,7 @@ function parseListPage(html) {
       _listMsrp: listMsrp
     });
   });
+  if (skipped.length > 0) console.warn(`WARNING: products list page skipped ${skipped.length} item(s) with a missing/unparseable slug (non-.html href?): ${skipped.join(', ')}`);
   return items;
 }
 
@@ -186,12 +188,12 @@ async function scrapeProducts(options = {}) {
     if (sweepsDone > 0) await delay(listDelay);
     const swept = await sweepListPages(listDelay);
     const uniqueInSweep = new Set(swept.map(it => it.product_id));
-    const clean = uniqueInSweep.size === swept.length; // no cross-page dup -> nothing was dropped
+    const dupFree = uniqueInSweep.size === swept.length; // no cross-page dup -> nothing was dropped (named to avoid shadowing the module-level clean() helper)
     let added = 0;
     for (const it of swept) if (it.product_id && !byId.has(it.product_id)) { byId.set(it.product_id, it); added++; }
     sweepsDone++;
-    console.log(`Products: list sweep ${sweepsDone} -> ${swept.length} entries, ${uniqueInSweep.size} unique${clean ? ' (clean)' : ' (has a cross-page dup; a boundary item was dropped)'}, ${added} new (union now ${byId.size})`);
-    if (clean) { sawCleanSweep = true; break; } // a duplicate-free sweep IS the complete set
+    console.log(`Products: list sweep ${sweepsDone} -> ${swept.length} entries, ${uniqueInSweep.size} unique${dupFree ? ' (clean)' : ' (has a cross-page dup; a boundary item was dropped)'}, ${added} new (union now ${byId.size})`);
+    if (dupFree) { sawCleanSweep = true; break; } // a duplicate-free sweep IS the complete set
   }
   if (!sawCleanSweep) console.warn(`WARNING: no duplicate-free products list sweep after ${sweepsDone} tries; using the union of ${byId.size} (source pagination stayed unstable).`);
   const items = [...byId.values()];

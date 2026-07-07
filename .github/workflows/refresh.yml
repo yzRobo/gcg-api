@@ -17,9 +17,28 @@ jobs:
         with: { node-version: '22' }
       - run: npm ci           # requires package-lock.json to be committed (run npm install locally once and commit the lockfile)
       - name: Scrape + build artifacts (fails loudly on sanity error)
-        run: node src/cli.js
+        # tee the build log so the next step can surface product-data degradation as annotations.
+        # GitHub's default bash runs with `set -eo pipefail`, so a non-zero node exit still fails
+        # the step (the sanity gate keeps its loud-fail behavior) even through the pipe.
+        run: node src/cli.js 2>&1 | tee "$RUNNER_TEMP/build.log"
         env:
           DATASET_VERSION: ${{ github.run_number }}-${{ github.sha }}
+      - name: Surface product-data degradation on the run summary
+        # Products are SUPPLEMENTARY (cards already passed their sanity gate above), so a products
+        # warning must NOT fail the run - it is promoted to a GitHub ::warning:: annotation instead,
+        # visible on the run summary without opening the log. Catches zero-guard / shrink-guard /
+        # union-fallback / skipped-item warnings and a supplementary scrape failure.
+        run: |
+          log="$RUNNER_TEMP/build.log"
+          if [ ! -f "$log" ]; then echo "no build log; skipping"; exit 0; fi
+          matches=$(grep -iE '(warning|failed)' "$log" | grep -iE 'product' || true)
+          if [ -n "$matches" ]; then
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::warning title=Products data degraded::${line}"
+            done <<< "$matches"
+          else
+            echo "No product-data warnings."
+          fi
       - name: Generate D1 import SQL
         run: node scripts/gen-sql.js
         env:

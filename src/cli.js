@@ -83,9 +83,19 @@ async function main() {
     products = null;
   }
   if (products && products.length > 0) {
-    if (products.length < 10) console.warn(`WARNING: only ${products.length} products (baseline ~44-48) - possible partial scrape`);
-    fs.writeFileSync(productsPath, JSON.stringify(products, null, 0));
-    console.log(`Wrote products.json (${products.length} products)`);
+    let existing = 0;
+    try { if (fs.existsSync(productsPath)) existing = JSON.parse(fs.readFileSync(productsPath, 'utf8')).length; } catch (_) {}
+    // Shrink-guard: a "clean" but TRUNCATED sweep (e.g. the pager markup breaks so only page 1's
+    // 12 items are fetched - all unique, so the scraper's dup-free check reads it as complete)
+    // must not overwrite a much larger committed file. A real delisting is small (40->39); a
+    // pager collapse is large. Keep the existing file on a >25% drop (same posture as the zero-guard).
+    if (existing > 0 && products.length < existing * 0.75) {
+      console.warn(`WARNING: products scrape yielded ${products.length} but existing products.json has ${existing} rows (>25% drop) - KEEPING existing file (shrink-guard; likely a partial/pager-collapsed scrape).`);
+    } else {
+      if (products.length < 10) console.warn(`WARNING: only ${products.length} products (baseline ~44-48) - possible partial scrape`);
+      fs.writeFileSync(productsPath, JSON.stringify(products, null, 0));
+      console.log(`Wrote products.json (${products.length} products)`);
+    }
   } else {
     // Zero-guard (mandatory): a 0-product scrape (likely a selector break) must NOT wipe an
     // existing dataset wholesale. Keep the committed file if it has rows.
