@@ -380,6 +380,7 @@ async function route(url, env, version) {
       openapi: `${url.origin}/openapi.json`,
       register: `${url.origin}/register`,
       repository: 'https://github.com/yzRobo/gcg-api',
+      homepage: 'https://gcgapi.com',
       disclaimer: DISCLAIMER
     });
   }
@@ -554,7 +555,7 @@ function openapiSpec(url) {
         }
       },
       '/v1/manifest': {
-        get: { tags: ['meta'], summary: 'Dataset version, card count, bulk URL', responses: { '200': { description: 'Manifest' } } }
+        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
       '/v1/me': {
         get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key; response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
@@ -583,82 +584,167 @@ function openapiSpec(url) {
 
 function docsPage(url) {
   const base = url.origin;
+  // The table of contents ("On this page") is rendered twice: a sticky scroll-spy sidebar
+  // on wide screens and a collapsible <details> at the top of the content on narrow ones.
+  const TOC = [
+    ['limits', 'Rate limits &amp; keys'],
+    ['endpoints', 'Endpoints'],
+    ['cards-params', 'Query parameters', 'sub'],
+    ['examples', 'Examples', 'sub'],
+    ['responses', 'Response format'],
+    ['schema', 'Card schema'],
+    ['rulings', 'Rulings'],
+    ['bulk', 'Bulk download'],
+    ['caching', 'Caching &amp; CORS'],
+    ['license', 'License &amp; attribution']
+  ];
+  const tocLinks = TOC.map(([id, label, sub]) => `<a href="#${id}"${sub ? ' class="sub"' : ''}>${label}</a>`).join('\n    ');
   const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gcg-api - Gundam Card Game data API</title>
+<meta name="description" content="Documentation for gcg-api: a free, unofficial read-only REST API and downloadable dataset for the Gundam Card Game.">
 <style>
   :root { color-scheme: light dark; --border: #8883; --muted: #8889; --accent: #3a7; }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem 4rem; line-height: 1.55; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1120px; margin: 0 auto; padding: 2rem 1.25rem 4rem; line-height: 1.55; }
+  .layout { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 2.75rem; }
+  main { min-width: 0; }
+  nav.toc { position: sticky; top: 1.25rem; align-self: start; max-height: calc(100vh - 2.5rem); overflow-y: auto; font-size: .85rem; }
+  nav.toc .toc-title { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: .22rem .65rem; border-left: 2px solid var(--border); }
+  nav.toc a.sub { padding-left: 1.4rem; font-size: .8rem; }
+  nav.toc a:hover { color: inherit; }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+  details.toc-m { display: none; border: 1px solid var(--border); border-radius: 8px; padding: .6rem .9rem; margin: 1rem 0 1.5rem; font-size: .9rem; }
+  details.toc-m summary { cursor: pointer; font-weight: 600; }
+  details.toc-m a { display: block; padding: .25rem 0; }
+  @media (max-width: 900px) {
+    .layout { display: block; }
+    nav.toc { display: none; }
+    details.toc-m { display: block; }
+  }
+  section { scroll-margin-top: 1rem; }
   h1 { font-size: 1.7rem; margin-bottom: .2rem; }
   h2 { font-size: 1.25rem; margin-top: 2.2rem; border-bottom: 1px solid var(--border); padding-bottom: .3rem; }
   h3 { font-size: 1rem; margin-top: 1.4rem; }
+  h2 .anchor, h3 .anchor { color: var(--muted); text-decoration: none; opacity: 0; margin-left: .35rem; font-weight: 400; }
+  h2:hover .anchor, h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
   code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   code { background: #8882; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
   pre { background: #8881; border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; font-size: .85rem; }
+  pre code { background: none; padding: 0; }
   table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: .5rem 0; display: block; overflow-x: auto; }
   th, td { border: 1px solid var(--border); padding: .35rem .55rem; text-align: left; vertical-align: top; }
   th { background: #8882; }
   .muted { color: var(--muted); }
   .pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: .1rem .4rem; border-radius: 4px; background: var(--accent); color: #000; margin-right: .4rem; }
+  .pill.post { background: #b80; }
   .note { border-left: 3px solid var(--accent); padding: .5rem .9rem; margin: 1rem 0; background: #3a71; border-radius: 0 6px 6px 0; }
   .disclaimer { font-size: .82rem; color: var(--muted); margin-top: 2.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
-  a { color: inherit; }
+  main a, details.toc-m a { color: inherit; }
 </style>
 </head>
 <body>
+<div class="layout">
+  <nav class="toc" aria-label="On this page">
+    <p class="toc-title">On this page</p>
+    ${tocLinks}
+  </nav>
+  <main>
   <h1>gcg-api</h1>
   <p class="muted">Free, unofficial read-only REST API and downloadable dataset for the Gundam Card Game.</p>
-  <p>Base URL: <code>${base}</code> &nbsp;|&nbsp; <a href="${base}/openapi.json">OpenAPI spec</a> &nbsp;|&nbsp; <a href="https://github.com/yzRobo/gcg-api">GitHub</a></p>
+  <p>Base URL: <code>${base}</code> &nbsp;|&nbsp; <a href="${base}/openapi.json">OpenAPI spec</a> &nbsp;|&nbsp; <a href="https://github.com/yzRobo/gcg-api">GitHub</a> &nbsp;|&nbsp; <a href="https://gcgapi.com">Home</a></p>
+
+  <details class="toc-m"><summary>On this page</summary>
+    ${tocLinks}
+  </details>
 
   <div class="note">The card data files are the source of truth; this API is a convenience layer over them. For the whole dataset, download the bulk file (see below) rather than paging the API.</div>
 
-  <h2>Rate limits &amp; keys</h2>
+  <section id="limits">
+  <h2>Rate limits &amp; keys <a class="anchor" href="#limits" aria-label="Link to this section">#</a></h2>
   <ul>
-    <li><b>Keyless</b>: up to ~60 requests/minute per IP. No signup.</li>
-    <li><b>Free key</b>: up to ~300 requests/minute. Get one at <a href="${base}/register">/register</a> and send it as the <code>X-API-Key</code> header.</li>
+    <li><b>Keyless</b>: up to ~${ANON_LIMIT} requests/minute per IP. No signup.</li>
+    <li><b>Free key</b>: up to ~${KEYED_LIMIT} requests/minute. Get one at <a href="${base}/register">/register</a> and send it as the <code>X-API-Key</code> header.</li>
   </ul>
   <p class="muted">Limits are enforced per Cloudflare location, so they are approximate ceilings. Over the limit returns <code>429</code> with a <code>Retry-After</code> header.</p>
+  <p>Check a key's status and usage at <code>/v1/me</code> (send the key as <code>X-API-Key</code>): active/revoked, tier, limit, and request counts for today / last 7 days / last 30 days. Usage is counted per key per day; anonymous traffic is never tracked. Per-minute remaining is not queryable by design. A browser version lives at <a href="https://gcgapi.com/key">gcgapi.com/key</a>.</p>
+  </section>
 
-  <h2>Endpoints</h2>
+  <section id="endpoints">
+  <h2>Endpoints <a class="anchor" href="#endpoints" aria-label="Link to this section">#</a></h2>
   <table>
     <tr><th>Method / Path</th><th>Description</th></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards</code></td><td>List/filter cards. Query params below.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing). Add <code>?include=rulings</code> for official FAQ rulings (link-only).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, bulk URL.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>. Unpaginated; <code>_meta.count</code> has the size.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, bulk URL.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
-    <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/me</code></td><td>Your key status, tier, limit, and usage today/7d/30d (send <code>X-API-Key</code>; never cached).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
+    <tr><td><span class="pill post">POST</span><code>/v1/keys</code></td><td>Issues a key; used by /register. Requires a Cloudflare Turnstile token.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/openapi.json</code></td><td>OpenAPI 3.0 spec (machine-readable).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/docs</code></td><td>This page.</td></tr>
   </table>
+  </section>
 
-  <h3>/v1/cards query parameters</h3>
+  <section id="cards-params">
+  <h3>/v1/cards query parameters <a class="anchor" href="#cards-params" aria-label="Link to this section">#</a></h3>
   <table>
     <tr><th>Param</th><th>Type</th><th>Match</th></tr>
     <tr><td>set_code, card_type, color, rarity</td><td>string</td><td>exact (set_code/card_type case-insensitive)</td></tr>
-    <tr><td>level, cost, ap, hp</td><td>integer</td><td>exact</td></tr>
+    <tr><td>level, cost, ap, hp</td><td>integer</td><td>exact (non-numeric values are ignored)</td></tr>
     <tr><td>name, effect</td><td>string</td><td>substring (case-insensitive)</td></tr>
     <tr><td>keyword</td><td>string</td><td>has a keyword ability / timing marker (e.g. Blocker, Repair, Burst)</td></tr>
     <tr><td>limit</td><td>integer</td><td>page size, 1-250 (default 100)</td></tr>
     <tr><td>offset</td><td>integer</td><td>page offset (default 0)</td></tr>
   </table>
+  <p class="muted">Filters combine with AND. Unknown parameters are ignored.</p>
+  </section>
 
-  <h3>Examples</h3>
+  <section id="examples">
+  <h3>Examples <a class="anchor" href="#examples" aria-label="Link to this section">#</a></h3>
   <pre>curl "${base}/v1/cards?color=Blue&amp;card_type=UNIT&amp;limit=5"
 curl "${base}/v1/cards?name=Gundam&amp;cost=3"
+curl "${base}/v1/cards?keyword=blocker&amp;color=Green"
 curl "${base}/v1/cards/GD01-001"
+curl "${base}/v1/cards/GD01-001?include=rulings"
 curl "${base}/v1/sets"
 curl "${base}/v1/sets/GD01/cards"
 curl "${base}/v1/manifest"
 
 # with a free key (higher rate limit)
-curl "${base}/v1/cards?limit=250" -H "X-API-Key: gcd_your_key_here"</pre>
+curl "${base}/v1/cards?limit=250" -H "X-API-Key: gcd_your_key_here"
+# key status + usage
+curl "${base}/v1/me" -H "X-API-Key: gcd_your_key_here"</pre>
+  </section>
 
-  <h2>Card schema</h2>
+  <section id="responses">
+  <h2>Response format <a class="anchor" href="#responses" aria-label="Link to this section">#</a></h2>
+  <p>List endpoints wrap results in an envelope; single-card responses use the same shape with an object in <code>data</code>:</p>
+  <pre>{
+  "_meta": { "disclaimer": "...", "total": 355, "limit": 100, "offset": 0, "count": 100 },
+  "data": [ ... ]
+}</pre>
+  <p><code>total</code> is the full match count; <code>count</code> is the number in this page. Errors are JSON with an <code>error</code> field:</p>
+  <table>
+    <tr><th>Status</th><th>When</th></tr>
+    <tr><td><code>400</code></td><td>Malformed card id in <code>/v1/cards/{id}</code>.</td></tr>
+    <tr><td><code>404</code></td><td>Unknown card or route. Unknown routes include an <code>endpoints</code> list.</td></tr>
+    <tr><td><code>405</code></td><td>Any method other than GET (plus <code>POST /v1/keys</code> and OPTIONS).</td></tr>
+    <tr><td><code>429</code></td><td>Rate limited. Includes <code>tier</code> and <code>limit_per_minute</code>; carries a <code>Retry-After: 60</code> header and is never cached.</td></tr>
+    <tr><td><code>5xx</code></td><td>Internal error (no detail leaked) or, for <code>/v1/keys</code>, registration not configured (501).</td></tr>
+  </table>
+  </section>
+
+  <section id="schema">
+  <h2>Card schema <a class="anchor" href="#schema" aria-label="Link to this section">#</a></h2>
   <table>
     <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
     <tr><td>product_id</td><td>string</td><td>Natural key; unique per printing (alt-arts get _p1/_p2)</td></tr>
@@ -682,17 +768,75 @@ curl "${base}/v1/cards?limit=250" -H "X-API-Key: gcd_your_key_here"</pre>
     <tr><td>ap_raw, hp_raw</td><td>string | null</td><td>raw stat strings; preserve PILOT "+1" modifiers</td></tr>
     <tr><td>where_to_get</td><td>string | null</td><td>product/event provenance (unique for promos)</td></tr>
   </table>
+  </section>
 
-  <h2>Bulk download</h2>
+  <section id="rulings">
+  <h2>Rulings <a class="anchor" href="#rulings" aria-label="Link to this section">#</a></h2>
+  <p>Official per-card FAQ rulings from the source site, captured <b>link-only</b>: the ruling number, date, and question, plus a <code>source_url</code> back to the official card page. Answer text is not reproduced - follow <code>source_url</code> to read Bandai's answer.</p>
+  <pre>curl "${base}/v1/cards/GD01-001?include=rulings"
+
+"rulings": [
+  {
+    "num": "Q119",
+    "date": "July 11, 2025",
+    "question": "Does this Unit also gain &lt;Repair: 1&gt; from the first effect?",
+    "source_url": "https://www.gundam-gcg.com/en/cards/detail.php?detailSearch=GD01-001"
+  }
+]</pre>
+  <p class="muted">Cards without rulings return an empty array. Rulings attach only on <code>/v1/cards/{id}</code>; the ruling total is in <code>/v1/manifest</code>.</p>
+  </section>
+
+  <section id="bulk">
+  <h2>Bulk download <a class="anchor" href="#bulk" aria-label="Link to this section">#</a></h2>
   <p>The full dataset is a single newline-delimited JSON file, always current, on the GitHub Release:</p>
   <pre>curl -L "${base}/v1/bulk" -o cards.ndjson</pre>
+  <p class="muted">The Release also carries <code>cards.json</code>, <code>manifest.json</code>, and <code>rulings.json</code>. Bulk downloads are unmetered - they never touch the API's rate limits.</p>
+  </section>
 
-  <h2>License &amp; attribution</h2>
+  <section id="caching">
+  <h2>Caching &amp; CORS <a class="anchor" href="#caching" aria-label="Link to this section">#</a></h2>
+  <ul>
+    <li>Successful GET responses are cached at Cloudflare's edge for up to 24 hours (<code>Cache-Control: public, max-age=86400</code>). Cache keys include the dataset version, so each weekly refresh serves fresh data immediately.</li>
+    <li><code>/v1/me</code>, <code>/register</code>, and error responses (including 429) are never cached.</li>
+    <li>CORS is open: <code>Access-Control-Allow-Origin: *</code>, with <code>Content-Type</code> and <code>X-API-Key</code> request headers allowed - the API is callable straight from a browser.</li>
+    <li>Methods: GET everywhere, plus <code>POST /v1/keys</code>. Anything else returns 405.</li>
+  </ul>
+  </section>
+
+  <section id="license">
+  <h2>License &amp; attribution <a class="anchor" href="#license" aria-label="Link to this section">#</a></h2>
   <p>Code: <b>MIT</b>. Data compilation (factual fields only): <b>CC0-1.0</b>. Neither grants any rights in Bandai's card names, effect text, artwork, or trademarks.</p>
   <p class="muted">Data scraped from the official site <a href="https://www.gundam-gcg.com/en/cards">gundam-gcg.com</a>. Community prior art: <a href="https://exburst.dev">ExBurst</a>, <a href="https://egmanevents.com">EGMAN Events</a>.</p>
   <p>Issues, corrections, or takedown requests: <a href="https://github.com/yzRobo/gcg-api/issues">GitHub Issues</a>.</p>
-
   <p class="disclaimer">${DISCLAIMER} This project is not produced by, endorsed by, supported by, or affiliated with Bandai.</p>
+  </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  var sections = Array.prototype.slice.call(document.querySelectorAll('main section[id]'));
+  var visible = {};
+  var current = null;
+  function activate(id) {
+    if (current === id) return;
+    current = id;
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (map[id]) map[id].classList.add('active');
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) { activate(sections[i].id); return; }
+    }
+  }, { rootMargin: '0px 0px -55% 0px', threshold: 0 });
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
 </body>
 </html>`;
   return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', ...CORS } });
