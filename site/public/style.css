@@ -226,6 +226,7 @@ footer.site { padding-top: 2.5rem; padding-bottom: 3rem; border-top: 1px solid v
 .key-page { padding-top: 3.5rem; padding-bottom: 3.5rem; }
 .key-h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 680; letter-spacing: -0.02em; margin: 0 0 0.6rem; }
 .key-lede { color: var(--muted); max-width: 58ch; margin: 0 0 1.75rem; }
+.key-register { color: var(--muted); max-width: 58ch; margin: 0 0 1.9rem; }
 #key-form { max-width: 480px; }
 .key-input-row { display: flex; gap: 0.5rem; }
 #key-input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 0.95rem; padding: 0.6rem 0.75rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
