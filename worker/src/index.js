@@ -523,7 +523,7 @@ function openapiSpec(url) {
       title: 'gcg-api',
       version: '1',
       description: 'Free, unofficial read-only REST API for Gundam Card Game data. Not affiliated with Bandai. ' + DISCLAIMER,
-      license: { name: 'MIT (code) / CC0-1.0 (data compilation)', url: 'https://github.com/yzRobo/gcg-api' }
+      license: { name: 'MIT (code) / ODbL-1.0 (data compilation; pre-2026-07-07 snapshots remain CC0)', url: 'https://github.com/yzRobo/gcg-api' }
     },
     servers: [{ url: url.origin }],
     tags: [{ name: 'cards' }, { name: 'sets' }, { name: 'meta' }, { name: 'keys' }],
@@ -805,7 +805,8 @@ curl "${base}/v1/me" -H "X-API-Key: gcd_your_key_here"</pre>
 
   <section id="license">
   <h2>License &amp; attribution <a class="anchor" href="#license" aria-label="Link to this section">#</a></h2>
-  <p>Code: <b>MIT</b>. Data compilation (factual fields only): <b>CC0-1.0</b>. Neither grants any rights in Bandai's card names, effect text, artwork, or trademarks.</p>
+  <p>Code: <b>MIT</b>. Data compilation (factual fields only): <b>ODbL 1.0</b> - use it freely, commercially included, with attribution; publicly used derivative databases must be shared alike. Apps and works built FROM the data are yours. Dataset versions distributed before 2026-07-07 remain CC0. Neither license grants any rights in Bandai's card names, effect text, artwork, or trademarks.</p>
+  <p class="muted">Suggested attribution: "Contains data from gcg-api (https://gcgapi.com), made available under the Open Database License (ODbL) v1.0."</p>
   <p class="muted">Data scraped from the official site <a href="https://www.gundam-gcg.com/en/cards">gundam-gcg.com</a>. Community prior art: <a href="https://exburst.dev">ExBurst</a>, <a href="https://egmanevents.com">EGMAN Events</a>.</p>
   <p>Issues, corrections, or takedown requests: <a href="https://github.com/yzRobo/gcg-api/issues">GitHub Issues</a>.</p>
   <p class="disclaimer">${DISCLAIMER} This project is not produced by, endorsed by, supported by, or affiliated with Bandai.</p>

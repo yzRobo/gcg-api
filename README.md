@@ -150,8 +150,13 @@ these if you depend on currency.
 ## License
 
 - **Code** (scraper, normalizer, CLI, D1 schema, Worker): [MIT](LICENSE).
-- **Data compilation** (the selection/arrangement of factual fields only): [CC0 1.0](LICENSE-DATA)
-  - public domain, no attribution required (though a credit to `gcg-api` is appreciated).
+- **Data compilation** (the selection/arrangement of factual fields only): [ODbL 1.0](LICENSE-DATA)
+  - use it freely, commercially included, with **attribution**; publicly used **derivative
+    databases must be shared alike**. Apps, sites, and analyses built *from* the data are yours.
+  - Suggested attribution: *"Contains data from gcg-api (https://gcgapi.com), made available
+    under the Open Database License (ODbL) v1.0."*
+  - Dataset versions distributed before 2026-07-07 were published under CC0 1.0; that
+    dedication is irrevocable for those snapshots.
 
 Neither license grants any rights in Bandai's card names, effect text, artwork, or trademarks.
 See [`LICENSE-DATA`](LICENSE-DATA) for the scope.

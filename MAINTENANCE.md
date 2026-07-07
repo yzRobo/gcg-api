@@ -12,8 +12,9 @@ that keeps it defensible:
   Do not add image rehosting or an image proxy on by default.
 - Card **names** and **effect text** are creative expression, not pure facts. The metadata-only,
   no-image-bytes stance is the real risk reducer.
-- Data compilation is **CC0**, scoped to factual fields only (see `LICENSE-DATA`) - it does not
-  purport to license Bandai's IP.
+- Data compilation is **ODbL 1.0** (attribution + share-alike for derivative databases), scoped
+  to factual fields only (see `LICENSE-DATA`) - it does not purport to license Bandai's IP.
+  Versions distributed before 2026-07-07 remain CC0 (irrevocable for those snapshots).
 - The **non-affiliation disclaimer** appears in the README, every successful (`_meta`-bearing)
   API response, `/docs`, the OpenAPI spec, and this file. Keep it on all these surfaces.
 - Stay a good-faith actor: polite rate limits, descriptive User-Agent, honor `robots.txt`,
