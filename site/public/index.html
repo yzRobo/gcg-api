@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gcg-api - Gundam Card Game data &amp; API</title>
+<meta name="description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game. Every card, structured effects, official rulings. No key required.">
+<meta name="theme-color" content="#0c0f12">
+<link rel="canonical" href="https://gcgapi.com/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="gcg-api - Gundam Card Game data &amp; API">
+<meta property="og:description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game. Every card, structured effects, official rulings. No key required.">
+<meta property="og:url" content="https://gcgapi.com/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="gcg-api - Gundam Card Game data &amp; API">
+<meta name="twitter:description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="site">
+  <a class="wordmark" href="/">gcg-api</a>
+  <nav aria-label="Primary">
+    <a href="https://api.gcgapi.com/docs">docs</a>
+    <a href="/key">key</a>
+    <a href="https://api.gcgapi.com/openapi.json">openapi</a>
+    <a href="https://github.com/yzRobo/gcg-api">github</a>
+  </nav>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <h1>The Gundam Card Game, in JSON.</h1>
+      <p class="lede">gcg-api is a free, open dataset and REST API for Bandai's Gundam Card Game - scraped weekly from the official card database, served from the edge, no key required.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://api.gcgapi.com/docs">Read the docs</a>
+        <a class="btn outline" href="https://github.com/yzRobo/gcg-api">GitHub</a>
+      </div>
+    </div>
+
+    <div class="terminal" aria-label="Example request and response">
+      <div class="terminal-bar"><span class="mono">curl</span></div>
+      <pre class="terminal-body"><span class="cmd"><span class="prompt">$</span> curl https://api.gcgapi.com/v1/cards/GD01-001</span>
+<span class="p">{</span>
+  <span class="k">"product_id"</span><span class="p">:</span> <span class="s">"GD01-001"</span><span class="p">,</span>
+  <span class="k">"name"</span><span class="p">:</span> <span class="s">"Gundam"</span><span class="p">,</span>
+  <span class="k">"set_name"</span><span class="p">:</span> <span class="s">"Newtype Rising"</span><span class="p">,</span>
+  <span class="k">"rarity"</span><span class="p">:</span> <span class="s">"LR"</span><span class="p">,</span>
+  <span class="k">"card_type"</span><span class="p">:</span> <span class="s">"UNIT"</span><span class="p">,</span>
+  <span class="k">"color"</span><span class="p">:</span> <span class="s">"Blue"</span><span class="p">,</span>
+  <span class="k">"level"</span><span class="p">:</span> <span class="n">4</span><span class="p">,</span> <span class="k">"cost"</span><span class="p">:</span> <span class="n">3</span><span class="p">,</span> <span class="k">"ap"</span><span class="p">:</span> <span class="n">3</span><span class="p">,</span> <span class="k">"hp"</span><span class="p">:</span> <span class="n">3</span><span class="p">,</span>
+  <span class="k">"keyword_effects"</span><span class="p">:</span> <span class="p">[{</span> <span class="k">"keyword"</span><span class="p">:</span> <span class="s">"Repair"</span><span class="p">,</span> <span class="k">"value"</span><span class="p">:</span> <span class="n">1</span> <span class="p">}],</span>
+  <span class="k">"timing_markers"</span><span class="p">:</span> <span class="p">[</span><span class="s">"When Paired"</span><span class="p">],</span>
+  <span class="k">"image_url"</span><span class="p">:</span> <span class="s">"https://www.gundam-gcg.com/..."</span><span class="p">,</span>
+  <span class="c">...</span>
+<span class="p">}</span></pre>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Dataset at a glance">
+    <div class="stat">
+      <div class="num mono" id="stat-cards">1,529</div>
+      <div class="lbl">cards indexed</div>
+    </div>
+    <div class="stat">
+      <div class="num mono" id="stat-sets">23</div>
+      <div class="lbl">sets &amp; promo groups</div>
+    </div>
+    <div class="stat">
+      <div class="num mono" id="stat-rulings">217</div>
+      <div class="lbl">official rulings linked</div>
+    </div>
+    <div class="stat">
+      <div class="num mono" id="stat-refresh">Mondays 06:00 UTC</div>
+      <div class="lbl">refreshed</div>
+    </div>
+    <p class="live-note mono" id="live-note" hidden></p>
+  </section>
+
+  <section>
+    <p class="eyebrow mono">start in ten seconds</p>
+    <div class="snippets">
+      <div class="snippet">
+        <code>curl https://api.gcgapi.com/v1/cards/GD01-001</code>
+        <button class="copy" type="button" aria-label="Copy command">copy</button>
+      </div>
+      <div class="snippet">
+        <code>curl "https://api.gcgapi.com/v1/cards?color=Blue&amp;keyword=blocker"</code>
+        <button class="copy" type="button" aria-label="Copy command">copy</button>
+      </div>
+      <div class="snippet">
+        <code>curl -L https://api.gcgapi.com/v1/bulk -o cards.ndjson</code>
+        <button class="copy" type="button" aria-label="Copy command">copy</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow mono">what's in the data</p>
+    <dl class="defs">
+      <dt>Every printing</dt>
+      <dd>base cards and alt-arts, keyed by <code>product_id</code>; alt-arts share a <code>card_number</code>.</dd>
+      <dt>Structured effects</dt>
+      <dd>keyword abilities and timing markers parsed into arrays; filter with <code>?keyword=</code>.</dd>
+      <dt>Official rulings</dt>
+      <dd>per-card FAQ entries (question + date + citation link back to the official page) via <code>?include=rulings</code>.</dd>
+      <dt>Bulk files</dt>
+      <dd>the entire dataset as NDJSON/JSON on GitHub Releases. Unmetered; the files are the source of truth.</dd>
+      <dt>OpenAPI</dt>
+      <dd>machine-readable spec at <code>/openapi.json</code>; import it into any client.</dd>
+      <dt>Self-serve keys</dt>
+      <dd>optional; raises the rate limit. Browser challenge, no account, no email.</dd>
+    </dl>
+  </section>
+
+  <section>
+    <p class="eyebrow mono">free means free</p>
+    <table class="tiers">
+      <tbody>
+        <tr><th scope="row">Keyless</th><td>~60 requests/min per IP</td><td>no signup</td></tr>
+        <tr><th scope="row">Free key</th><td>~300 requests/min</td><td><a href="https://api.gcgapi.com/register">/register</a></td></tr>
+        <tr><th scope="row">Bulk download</th><td>unmetered</td><td>the source of truth</td></tr>
+      </tbody>
+    </table>
+    <p class="note">The API is a convenience layer over the files. Pulling everything? Download the Release instead of paging.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow mono">built in the open</p>
+    <p class="open">MIT-licensed code, CC0 data compilation. A GitHub Action re-scrapes the official site every Monday and commits the result - the repo history is the changelog.</p>
+    <p class="open-links"><a href="https://github.com/yzRobo/gcg-api">github.com/yzRobo/gcg-api</a> &nbsp;·&nbsp; <a href="https://github.com/yzRobo/gcg-api/releases/tag/data-latest">latest data release</a></p>
+  </section>
+
+</main>
+
+<footer class="site">
+  <p class="disclaimer">This project is not produced by, endorsed by, supported by, or affiliated with Bandai. Gundam and all related card names, effect text, artwork, and trademarks are the property of Bandai and its licensors.</p>
+  <p class="attrib">Card data from <a href="https://www.gundam-gcg.com/en/cards">gundam-gcg.com</a>. Community prior art: <a href="https://exburst.dev">ExBurst</a>, <a href="https://egmanevents.com">EGMAN Events</a>.</p>
+  <p class="foot-meta"><a href="https://github.com/yzRobo/gcg-api/issues">Issues, corrections, takedown requests</a> &nbsp;·&nbsp; MIT code, CC0 data &nbsp;·&nbsp; &copy; 2026 yzRobo</p>
+</footer>
+
+<script src="/main.js" defer></script>
+</body>
+</html>

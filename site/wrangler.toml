@@ -1,0 +1,16 @@
+name = "gcg-landing"
+compatibility_date = "2026-01-01"
+
+# Apex custom domain on the existing gcgapi.com zone (same pattern as api.gcgapi.com).
+# wrangler provisions DNS + TLS on deploy; Cloudflare handles apex flattening.
+# NOTE: this top-level `routes` array MUST appear before the [assets] table - a TOML table
+# header claims every following key, so placing it after [assets] parses it as assets.routes
+# (wrangler warns "Unexpected fields in assets") and the domain never binds.
+routes = [
+  { pattern = "gcgapi.com", custom_domain = true }
+]
+
+# Static-assets-only worker: no script needed. Requests served from assets are FREE on
+# the Workers free plan and do not count against the 100k/day Worker request budget.
+[assets]
+directory = "./public"

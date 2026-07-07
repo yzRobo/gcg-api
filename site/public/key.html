@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gcg-api - key status</title>
+<meta name="description" content="Check your gcg-api key: status, tier, and usage. Your key is only sent to the API as a header.">
+<meta name="theme-color" content="#0c0f12">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="site">
+  <a class="wordmark" href="/">gcg-api</a>
+  <nav aria-label="Primary">
+    <a href="https://api.gcgapi.com/docs">docs</a>
+    <a href="/key" aria-current="page">key</a>
+    <a href="https://api.gcgapi.com/openapi.json">openapi</a>
+    <a href="https://github.com/yzRobo/gcg-api">github</a>
+  </nav>
+</header>
+
+<main class="key-page">
+  <p class="eyebrow mono">api key status</p>
+  <h1 class="key-h1">Check your key</h1>
+  <p class="key-lede">Look up a key's status, tier, and usage. The key is sent only to the API as an <code>X-API-Key</code> header - never to this page's host, never in a URL.</p>
+
+  <form id="key-form" novalidate>
+    <div class="key-input-row">
+      <input id="key-input" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="gcd_..." aria-label="API key">
+      <button id="toggle" type="button" class="ghost" aria-label="Show or hide key">show</button>
+    </div>
+    <label class="remember"><input id="remember" type="checkbox"> Remember on this device</label>
+    <button id="check" type="submit" class="btn primary">Check</button>
+  </form>
+
+  <div id="msg" class="key-msg" role="status" hidden></div>
+
+  <div id="result" class="result" hidden>
+    <div class="result-row">
+      <span class="result-lbl mono">status</span>
+      <span id="r-status" class="result-val"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-lbl mono">tier</span>
+      <span id="r-tier" class="result-val"></span>
+    </div>
+    <div class="result-row usage-row">
+      <span class="result-lbl mono">usage</span>
+      <div class="usage">
+        <div class="usage-fig"><span id="r-today" class="mono num">0</span><span class="usage-cap">today</span>
+          <div class="meter" id="r-meter" hidden><i></i></div>
+        </div>
+        <div class="usage-fig"><span id="r-7d" class="mono num">0</span><span class="usage-cap">last 7 days</span></div>
+        <div class="usage-fig"><span id="r-30d" class="mono num">0</span><span class="usage-cap">last 30 days</span></div>
+      </div>
+    </div>
+  </div>
+
+  <noscript>
+    <p class="note">Usage lookup needs JavaScript. Without it: keyless access is about 60 requests/minute per IP; a free key raises it to about 300/minute. Get one at <a href="https://api.gcgapi.com/register">/register</a>.</p>
+  </noscript>
+
+  <p class="footnote">Per-minute remaining is not queryable - limits are enforced per Cloudflare location. If you are over the limit, requests return 429 with a Retry-After header.</p>
+</main>
+
+<footer class="site">
+  <p class="disclaimer">This project is not produced by, endorsed by, supported by, or affiliated with Bandai. Gundam and all related card names, effect text, artwork, and trademarks are the property of Bandai and its licensors.</p>
+  <p class="attrib">Card data from <a href="https://www.gundam-gcg.com/en/cards">gundam-gcg.com</a>. Community prior art: <a href="https://exburst.dev">ExBurst</a>, <a href="https://egmanevents.com">EGMAN Events</a>.</p>
+  <p class="foot-meta"><a href="https://github.com/yzRobo/gcg-api/issues">Issues, corrections, takedown requests</a> &nbsp;·&nbsp; MIT code, CC0 data &nbsp;·&nbsp; &copy; 2026 yzRobo</p>
+</footer>
+
+<script>
+(function () {
+  var form = document.getElementById('key-form');
+  var input = document.getElementById('key-input');
+  var toggle = document.getElementById('toggle');
+  var remember = document.getElementById('remember');
+  var check = document.getElementById('check');
+  var result = document.getElementById('result');
+  var msg = document.getElementById('msg');
+  var STORE = 'gcgapi_key';
+
+  // Prefill only if the user previously opted in to remember on this device.
+  try {
+    var saved = localStorage.getItem(STORE);
+    if (saved) { input.value = saved; remember.checked = true; }
+  } catch (e) {}
+
+  toggle.addEventListener('click', function () {
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    toggle.textContent = showing ? 'show' : 'hide';
+  });
+
+  function setMsg(text) { msg.textContent = text; msg.hidden = !text; }
+  function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+  function renderKeyed(data) {
+    var revoked = data.key && data.key.revoked;
+    var status = document.getElementById('r-status');
+    status.textContent = revoked ? 'Revoked' : 'Active';
+    status.className = 'result-val ' + (revoked ? 'is-revoked' : 'is-active');
+    if (data.key) {
+      var extra = [];
+      if (data.key.label) extra.push(data.key.label);
+      if (data.key.created_at) extra.push('created ' + String(data.key.created_at).slice(0, 10));
+      if (extra.length) { status.textContent += '  '; var s = document.createElement('span'); s.className = 'result-sub'; s.textContent = extra.join(' · '); status.appendChild(s); }
+    }
+    document.getElementById('r-tier').textContent = revoked
+      ? 'Revoked - anonymous limits apply (~60 requests/minute per IP)'
+      : 'Free key - about ' + (data.limit_per_minute || 300) + ' requests/minute';
+    var u = data.usage || {};
+    document.getElementById('r-today').textContent = fmt(u.today);
+    document.getElementById('r-7d').textContent = fmt(u.last_7_days);
+    document.getElementById('r-30d').textContent = fmt(u.last_30_days);
+    var meter = document.getElementById('r-meter');
+    if (u.last_7_days > 0) {
+      var pct = Math.max(0, Math.min(100, Math.round((u.today / u.last_7_days) * 100)));
+      meter.querySelector('i').style.width = pct + '%';
+      meter.hidden = false;
+    } else { meter.hidden = true; }
+    result.hidden = false;
+  }
+
+  function renderAnon() {
+    document.getElementById('r-status').textContent = 'No matching key';
+    document.getElementById('r-status').className = 'result-val';
+    document.getElementById('r-tier').textContent = 'No key - about 60 requests/minute per IP. Get one at /register.';
+    document.getElementById('r-today').textContent = '0';
+    document.getElementById('r-7d').textContent = '0';
+    document.getElementById('r-30d').textContent = '0';
+    document.getElementById('r-meter').hidden = true;
+    result.hidden = false;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var key = input.value.trim();
+    // Persist only on explicit opt-in; otherwise the key stays in memory only.
+    try { if (remember.checked && key) localStorage.setItem(STORE, key); else localStorage.removeItem(STORE); } catch (er) {}
+    if (!key) { result.hidden = true; setMsg('Enter a key to check.'); return; }
+    setMsg('');
+    result.hidden = true;
+    check.disabled = true;
+    var prev = check.textContent;
+    check.textContent = 'Checking';
+    // The key is only ever sent as a header to the API origin, never to this page's host.
+    fetch('https://api.gcgapi.com/v1/me', { headers: { 'X-API-Key': key } })
+      .then(function (r) {
+        if (r.status === 429) { setMsg('Rate limited right now - retry in about a minute.'); return null; }
+        if (r.status === 404) { setMsg('Usage lookup is not live yet. Keyless is ~60 req/min per IP; a free key raises it to ~300/min.'); return null; }
+        if (!r.ok) { setMsg('Could not check that key right now. Try again.'); return null; }
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data) return;
+        if (data.tier === 'keyed') renderKeyed(data); else renderAnon();
+      })
+      .catch(function () { setMsg('Network error. Check your connection and try again.'); })
+      .then(function () { check.disabled = false; check.textContent = prev; });
+  });
+})();
+</script>
+</body>
+</html>
