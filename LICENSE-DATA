@@ -2,9 +2,9 @@ gcg-api DATA COMPILATION LICENSE
 ================================
 
 Applies to: the gcg-api data compilation - the selection, arrangement, and
-normalization of factual card fields distributed as the files under data/
-(cards.ndjson, cards.json, per-set files, sets index, rulings.json, manifest)
-and the database behind api.gcgapi.com.
+normalization of factual card and product fields distributed as the files under
+data/ (cards.ndjson, cards.json, per-set files, sets index, rulings.json,
+products.json, manifest) and the database behind api.gcgapi.com.
 
 License: Open Data Commons Open Database License (ODbL) v1.0 - full text below.
 

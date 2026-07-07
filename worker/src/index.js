@@ -19,7 +19,9 @@ const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '
 
 // Only these query params affect a response body; the cache key is built from them
 // (sorted) so junk params like ?_=<rand> cannot mint unlimited cache misses.
-const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'limit', 'offset', 'include'];
+// NOTE (cache-poisoning class): every param a route READS must be listed here, or two
+// different queries can collide on one cache entry. 'category' is the /v1/products filter.
+const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'category', 'limit', 'offset', 'include'];
 
 // JSON-in-TEXT columns are stored as strings in D1; parse them back to arrays before returning,
 // since every card route does SELECT * and returns rows verbatim.
@@ -389,7 +391,7 @@ async function route(url, env, version) {
   if (p === '/openapi.json') return json(openapiSpec(url));
 
   if (p === '/v1/manifest') {
-    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), product_count: await productCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
   }
 
   // Redirect bulk downloads to the rolling Release asset - no Worker compute.
@@ -415,6 +417,14 @@ async function route(url, env, version) {
   if ((m = p.match(/^\/v1\/sets\/([^/]+)\/cards$/))) {
     const { results } = await env.DB.prepare(`SELECT * FROM cards WHERE set_code = ?1 ORDER BY card_number`).bind(m[1].toUpperCase()).all();
     return json({ _meta: { disclaimer: DISCLAIMER, count: results.length }, data: results.map(hydrate) });
+  }
+
+  if ((m = p.match(/^\/v1\/sets\/([^/]+)\/products$/))) {
+    // Products sharing a set_code (e.g. GD01 -> its booster plus any related product). No JSON
+    // columns on products, so rows are returned verbatim (unlike cards, which need hydrate()).
+    // product_id is a stable tiebreak so same-date rows keep a deterministic (cache-stable) order.
+    const { results } = await env.DB.prepare(`SELECT * FROM products WHERE set_code = ?1 ORDER BY release_date, product_id`).bind(m[1].toUpperCase()).all();
+    return json({ _meta: { disclaimer: DISCLAIMER, count: results.length }, data: results });
   }
 
   if ((m = p.match(/^\/v1\/cards\/([^/]+)$/))) {
@@ -461,7 +471,39 @@ async function route(url, env, version) {
     return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results.map(hydrate) });
   }
 
-  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
+  // ---- Products (supplementary): metadata for boosters, starter decks, accessories, promos ----
+  if ((m = p.match(/^\/v1\/products\/([^/]+)$/))) {
+    let id;
+    try { id = decodeURIComponent(m[1]); } catch (_) { return json({ error: 'Bad request: malformed id' }, 400); }
+    // product_id slugs are always lowercase (built by slugFromUrl), so lowercase the lookup to
+    // be forgiving of /v1/products/ST10; there is no case where a stored id has uppercase.
+    const row = await env.DB.prepare(`SELECT * FROM products WHERE product_id = ?1 LIMIT 1`).bind(id.toLowerCase()).first();
+    if (!row) return json({ error: 'Not found' }, 404);
+    return json({ _meta: { disclaimer: DISCLAIMER }, data: row });
+  }
+
+  if (p === '/v1/products') {
+    const q = url.searchParams;
+    const where = [];
+    const binds = [];
+    // category = case-insensitive exact on category_tag (accepts boosterpack). Products with a
+    // null category_tag (e.g. limitedbox-beta) simply never match a ?category= filter.
+    if (q.get('category')) { binds.push(q.get('category').toUpperCase()); where.push(`UPPER(category_tag) = ?${binds.length}`); }
+    if (q.get('set_code')) { binds.push(q.get('set_code').toUpperCase()); where.push(`set_code = ?${binds.length}`); }
+    if (q.get('name')) { binds.push(`%${q.get('name')}%`); where.push(`name LIKE ?${binds.length}`); }
+
+    const limit = Math.min(Math.max(parseInt(q.get('limit') || '100', 10) || 100, 1), 250); // same clamps as /v1/cards
+    const offset = Math.min(Math.max(parseInt(q.get('offset') || '0', 10) || 0, 0), 1000000);
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const total = where.length
+      ? (await env.DB.prepare(`SELECT COUNT(*) AS n FROM products ${clause}`).bind(...binds).first()).n
+      : await productCount(env);
+    // Newest first; nulls last (unreleased/undated sink to the bottom), product_id as a stable tiebreak.
+    const { results } = await env.DB.prepare(`SELECT * FROM products ${clause} ORDER BY release_date IS NULL, release_date DESC, product_id LIMIT ${limit} OFFSET ${offset}`).bind(...binds).all();
+    return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results });
+  }
+
+  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/products', '/v1/products/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/sets/:code/products', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
 }
 
 // ---- OpenAPI 3 spec (served at /openapi.json). Kept in sync with route() by hand. ----
@@ -500,6 +542,24 @@ const CARD_SCHEMA = {
   }
 };
 
+const PRODUCT_SCHEMA = {
+  type: 'object',
+  properties: {
+    product_id: { type: 'string', description: 'Natural key: the detail-page filename slug, e.g. gd06, st10, deck-case02. Always lowercase.' },
+    name: { type: 'string', description: 'Product name as shown, e.g. "Generation Pulse [ST10]".' },
+    category_tag: { type: ['string', 'null'], description: 'Machine tag backing the ?category= filter: BOOSTERPACK, STARTERDECK, ACCESSORIES, PREMIUMBANDAI, OTHER. Null for a few uncategorized products.' },
+    category_label: { type: ['string', 'null'], description: 'Human label, e.g. "BOOSTER PACK".' },
+    set_code: { type: ['string', 'null'], description: 'Set code parsed from the name bracket (e.g. GD06, ST11); null for accessories without a set.' },
+    release_date: { type: ['string', 'null'], description: 'ISO YYYY-MM-DD, or null if unknown/unparseable.' },
+    release_date_raw: { type: ['string', 'null'], description: 'Verbatim source text (may carry a trailing "~" or a region note).' },
+    msrp: { type: ['string', 'null'], description: 'Verbatim MSRP string, e.g. "$15.99"; null for unreleased ("-").' },
+    msrp_value: { type: ['number', 'null'], description: 'Numeric MSRP parsed from msrp.' },
+    contents: { type: ['string', 'null'], description: 'Factual product-composition list from the detail page; marketing prose is excluded.' },
+    image_url: { type: 'string', description: 'Absolute gundam-gcg.com URL. NOT rehosted by this project.' },
+    product_url: { type: 'string', description: 'Official product detail page.' }
+  }
+};
+
 function openapiSpec(url) {
   const cardFilters = [
     ['set_code', 'string', 'Exact set code, e.g. GD01 (case-insensitive).'],
@@ -517,6 +577,14 @@ function openapiSpec(url) {
   cardFilters.push({ name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 100, minimum: 1, maximum: 250 }, description: 'Page size (clamped 1-250).' });
   cardFilters.push({ name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0, minimum: 0, maximum: 1000000 }, description: 'Page offset.' });
 
+  const productFilters = [
+    ['category', 'string', 'Exact category tag, case-insensitive: BOOSTERPACK, STARTERDECK, ACCESSORIES, PREMIUMBANDAI, OTHER.'],
+    ['set_code', 'string', 'Exact set code, e.g. GD06 (case-insensitive).'],
+    ['name', 'string', 'Case-insensitive substring match on name.']
+  ].map(([name, type, description]) => ({ name, in: 'query', required: false, schema: { type }, description }));
+  productFilters.push({ name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 100, minimum: 1, maximum: 250 }, description: 'Page size (clamped 1-250).' });
+  productFilters.push({ name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0, minimum: 0, maximum: 1000000 }, description: 'Page offset.' });
+
   return {
     openapi: '3.0.3',
     info: {
@@ -526,7 +594,7 @@ function openapiSpec(url) {
       license: { name: 'MIT (code) / ODbL-1.0 (data compilation; pre-2026-07-07 snapshots remain CC0)', url: 'https://github.com/yzRobo/gcg-api' }
     },
     servers: [{ url: url.origin }],
-    tags: [{ name: 'cards' }, { name: 'sets' }, { name: 'meta' }, { name: 'keys' }],
+    tags: [{ name: 'cards' }, { name: 'products' }, { name: 'sets' }, { name: 'meta' }, { name: 'keys' }],
     paths: {
       '/v1/cards': {
         get: {
@@ -544,6 +612,19 @@ function openapiSpec(url) {
           responses: { '200': { description: 'The card' }, '404': { description: 'Not found' } }
         }
       },
+      '/v1/products': {
+        get: {
+          tags: ['products'], summary: 'List/filter products (boosters, starter decks, accessories, promos)', parameters: productFilters,
+          responses: { '200': { description: 'Matching products, newest first, with pagination metadata' } }
+        }
+      },
+      '/v1/products/{id}': {
+        get: {
+          tags: ['products'], summary: 'Get one product by product_id',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'product_id slug, e.g. st10 or gd06 (case-insensitive).' }],
+          responses: { '200': { description: 'The product' }, '404': { description: 'Not found' } }
+        }
+      },
       '/v1/sets': {
         get: { tags: ['sets'], summary: 'List sets with card counts', responses: { '200': { description: 'Sets' } } }
       },
@@ -554,8 +635,15 @@ function openapiSpec(url) {
           responses: { '200': { description: 'Cards in the set' } }
         }
       },
+      '/v1/sets/{code}/products': {
+        get: {
+          tags: ['sets'], summary: 'All products for a set code',
+          parameters: [{ name: 'code', in: 'path', required: true, schema: { type: 'string' }, description: 'Set code, e.g. GD06.' }],
+          responses: { '200': { description: 'Products for the set' } }
+        }
+      },
       '/v1/manifest': {
-        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, bulk URL', responses: { '200': { description: 'Manifest' } } }
+        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
       '/v1/me': {
         get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key; response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
@@ -576,7 +664,7 @@ function openapiSpec(url) {
       }
     },
     components: {
-      schemas: { Card: CARD_SCHEMA },
+      schemas: { Card: CARD_SCHEMA, Product: PRODUCT_SCHEMA },
       securitySchemes: { ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Optional. Raises the rate limit from ~60 to ~300 requests/minute.' } }
     }
   };
@@ -593,6 +681,7 @@ function docsPage(url) {
     ['examples', 'Examples', 'sub'],
     ['responses', 'Response format'],
     ['schema', 'Card schema'],
+    ['products', 'Products'],
     ['rulings', 'Rulings'],
     ['bulk', 'Bulk download'],
     ['caching', 'Caching &amp; CORS'],
@@ -682,9 +771,12 @@ function docsPage(url) {
     <tr><th>Method / Path</th><th>Description</th></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards</code></td><td>List/filter cards. Query params below.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing). Add <code>?include=rulings</code> for official FAQ rulings (link-only).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/products</code></td><td>List/filter products (boosters, starter decks, accessories, promos). Query params below.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/products/{id}</code></td><td>One product by <code>product_id</code> slug, e.g. <code>st10</code>.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>. Unpaginated; <code>_meta.count</code> has the size.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, bulk URL.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/products</code></td><td>All products for a set code, e.g. <code>GD06</code>. Unpaginated.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, product count, bulk URL.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/me</code></td><td>Your key status, tier, limit, and usage today/7d/30d (send <code>X-API-Key</code>; never cached).</td></tr>
     <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
@@ -770,6 +862,41 @@ curl "${base}/v1/me" -H "X-API-Key: gcd_your_key_here"</pre>
   </table>
   </section>
 
+  <section id="products">
+  <h2>Products <a class="anchor" href="#products" aria-label="Link to this section">#</a></h2>
+  <p>Official product metadata: booster packs, starter decks, accessories, and promo products, scraped from the official products list. Metadata only - <b>images are hotlinked, never rehosted</b>, and marketing prose is excluded (same posture as ruling answers). <code>/v1/products</code> lists newest first (undated products sort last).</p>
+  <h3>Query parameters <a class="anchor" href="#products" aria-label="Link to this section">#</a></h3>
+  <table>
+    <tr><th>Param</th><th>Type</th><th>Match</th></tr>
+    <tr><td>category</td><td>string</td><td>exact on <code>category_tag</code>, case-insensitive (e.g. <code>boosterpack</code>, <code>starterdeck</code>, <code>accessories</code>)</td></tr>
+    <tr><td>set_code</td><td>string</td><td>exact, case-insensitive (e.g. <code>GD06</code>)</td></tr>
+    <tr><td>name</td><td>string</td><td>substring (case-insensitive)</td></tr>
+    <tr><td>limit</td><td>integer</td><td>page size, 1-250 (default 100)</td></tr>
+    <tr><td>offset</td><td>integer</td><td>page offset (default 0)</td></tr>
+  </table>
+  <h3>Product schema <a class="anchor" href="#products" aria-label="Link to this section">#</a></h3>
+  <table>
+    <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+    <tr><td>product_id</td><td>string</td><td>slug from the product URL (e.g. <code>st10</code>, <code>gd06</code>); PRIMARY KEY, always lowercase</td></tr>
+    <tr><td>name</td><td>string</td><td>e.g. "Generation Pulse [ST10]"</td></tr>
+    <tr><td>category_tag</td><td>string | null</td><td>BOOSTERPACK, STARTERDECK, ACCESSORIES, PREMIUMBANDAI, OTHER; backs the <code>category</code> filter. Null for a few uncategorized products (they never match a <code>category</code> filter)</td></tr>
+    <tr><td>category_label</td><td>string | null</td><td>human label, e.g. "BOOSTER PACK"</td></tr>
+    <tr><td>set_code</td><td>string | null</td><td>parsed from the name bracket; null for accessories without a set</td></tr>
+    <tr><td>release_date</td><td>string | null</td><td>ISO YYYY-MM-DD, or null if unknown/unparseable</td></tr>
+    <tr><td>release_date_raw</td><td>string | null</td><td>verbatim source text (may carry a "~" or region note)</td></tr>
+    <tr><td>msrp</td><td>string | null</td><td>verbatim, e.g. "$15.99"; null for unreleased ("-")</td></tr>
+    <tr><td>msrp_value</td><td>number | null</td><td>numeric MSRP parsed from <code>msrp</code></td></tr>
+    <tr><td>contents</td><td>string | null</td><td>factual product-composition list; marketing prose excluded</td></tr>
+    <tr><td>image_url</td><td>string</td><td>Absolute gundam-gcg.com URL. Images are NOT rehosted here.</td></tr>
+    <tr><td>product_url</td><td>string</td><td>official product detail page</td></tr>
+  </table>
+  <pre>curl "${base}/v1/products?category=boosterpack"
+curl "${base}/v1/products?set_code=ST10"
+curl "${base}/v1/products/st10"
+curl "${base}/v1/sets/GD06/products"</pre>
+  <p class="muted">Products are supplementary data on the same weekly refresh; a products scrape failure never affects card data. The product total is in <code>/v1/manifest</code>.</p>
+  </section>
+
   <section id="rulings">
   <h2>Rulings <a class="anchor" href="#rulings" aria-label="Link to this section">#</a></h2>
   <p>Official per-card FAQ rulings from the source site, captured <b>link-only</b>: the ruling number, date, and question, plus a <code>source_url</code> back to the official card page. Answer text is not reproduced - follow <code>source_url</code> to read Bandai's answer.</p>
@@ -790,7 +917,7 @@ curl "${base}/v1/me" -H "X-API-Key: gcd_your_key_here"</pre>
   <h2>Bulk download <a class="anchor" href="#bulk" aria-label="Link to this section">#</a></h2>
   <p>The full dataset is a single newline-delimited JSON file, always current, on the GitHub Release:</p>
   <pre>curl -L "${base}/v1/bulk" -o cards.ndjson</pre>
-  <p class="muted">The Release also carries <code>cards.json</code>, <code>manifest.json</code>, and <code>rulings.json</code>. Bulk downloads are unmetered - they never touch the API's rate limits.</p>
+  <p class="muted">The Release also carries <code>cards.json</code>, <code>manifest.json</code>, <code>rulings.json</code>, and <code>products.json</code>. Bulk downloads are unmetered - they never touch the API's rate limits.</p>
   </section>
 
   <section id="caching">
@@ -859,5 +986,16 @@ async function rulingCount(env) {
   const n = row ? parseInt(row.value, 10) : NaN;
   if (!Number.isNaN(n)) return n;
   const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM rulings`).first();
+  return c ? c.n : 0;
+}
+
+// Static product count from meta (written by the weekly import); falls back to COUNT(*).
+// gen-sql only writes the product_count meta row when products exist, so on a products-less
+// deployment this correctly falls through to COUNT(*) (which is 0 with an empty table).
+async function productCount(env) {
+  const row = await env.DB.prepare(`SELECT value FROM meta WHERE key = 'product_count'`).first();
+  const n = row ? parseInt(row.value, 10) : NaN;
+  if (!Number.isNaN(n)) return n;
+  const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM products`).first();
   return c ? c.n : 0;
 }

@@ -26,7 +26,8 @@ curl -L "https://api.gcgapi.com/v1/bulk" -o cards.ndjson
 ```
 
 The files also live in this repo under [`data/`](data/): `cards.ndjson`, `cards.json`,
-per-set files in `cards/en/*.json`, a set index in `sets/en/index.json`, and `manifest.json`.
+per-set files in `cards/en/*.json`, a set index in `sets/en/index.json`, `rulings.json`,
+`products.json`, and `manifest.json`.
 
 **2. Query the API** (a convenience layer over the files):
 
@@ -66,9 +67,12 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 |---|---|
 | `GET /v1/cards` | List/filter cards (query params below) |
 | `GET /v1/cards/{id}` | One card by `product_id` or `card_number` (a `card_number` returns the base printing). Add `?include=rulings` for the card's official FAQ rulings (link-only: number/date/question + source link) |
+| `GET /v1/products` | List/filter products - boosters, starter decks, accessories, promos (query params below) |
+| `GET /v1/products/{id}` | One product by `product_id` slug, e.g. `st10` |
 | `GET /v1/sets` | All sets with card counts |
 | `GET /v1/sets/{code}/cards` | All cards in a set, e.g. `GD01` |
-| `GET /v1/manifest` | Dataset version, card count, bulk URL |
+| `GET /v1/sets/{code}/products` | All products for a set code, e.g. `GD06` |
+| `GET /v1/manifest` | Dataset version, card/ruling/product counts, bulk URL |
 | `GET /v1/bulk` | 302 redirect to the full NDJSON dataset |
 | `GET /register` | Self-serve free API key page |
 | `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) - send `X-API-Key`; never cached |
@@ -120,6 +124,48 @@ List responses wrap results as `{ "_meta": { total, limit, offset, count, discla
 | `keywords_text` | string \| null | denormalized text backing the `keyword` filter |
 | `ap_raw`, `hp_raw` | string \| null | raw stat strings; preserve PILOT `+1`/`+2` modifiers that `ap`/`hp` drop |
 | `where_to_get` | string \| null | product/event this printing came from (unique for promos) |
+
+---
+
+## Products
+
+Product metadata (booster packs, starter decks, accessories, promos) is on the same weekly
+refresh. Products are **supplementary**: a products scrape failure never affects card data.
+Metadata only - product images are hotlinked, never rehosted, and marketing prose is excluded.
+`GET /v1/products` lists newest first (undated products sort last).
+
+`GET /v1/products` query parameters:
+
+| Param | Type | Match |
+|---|---|---|
+| `category` | string | exact on `category_tag`, case-insensitive (`boosterpack`, `starterdeck`, `accessories`, `premiumbandai`, `other`) |
+| `set_code` | string | exact, case-insensitive (e.g. `GD06`) |
+| `name` | string | substring (case-insensitive) |
+| `limit` | integer | page size, 1–250 (default 100) |
+| `offset` | integer | page offset (default 0) |
+
+Product schema:
+
+| Field | Type | Notes |
+|---|---|---|
+| `product_id` | string | **Natural key.** Slug from the product URL (e.g. `st10`, `gd06`); always lowercase |
+| `name` | string | e.g. `Generation Pulse [ST10]` |
+| `category_tag` | string \| null | `BOOSTERPACK`, `STARTERDECK`, `ACCESSORIES`, `PREMIUMBANDAI`, `OTHER`; backs the `category` filter. `null` for a few uncategorized products (they never match a `category` filter) |
+| `category_label` | string \| null | human label, e.g. `BOOSTER PACK` |
+| `set_code` | string \| null | parsed from the name bracket; `null` for accessories without a set |
+| `release_date` | string \| null | ISO `YYYY-MM-DD`, or `null` if unknown/unparseable |
+| `release_date_raw` | string \| null | verbatim source text (may carry a `~` or region note) |
+| `msrp` | string \| null | verbatim, e.g. `$15.99`; `null` for unreleased (`-`) |
+| `msrp_value` | number \| null | numeric MSRP parsed from `msrp` |
+| `contents` | string \| null | factual product-composition list; marketing prose excluded |
+| `image_url` | string | absolute `gundam-gcg.com` URL - **not** rehosted here |
+| `product_url` | string | official product detail page |
+
+```bash
+curl "https://api.gcgapi.com/v1/products?category=boosterpack"
+curl "https://api.gcgapi.com/v1/products/st10"
+curl "https://api.gcgapi.com/v1/sets/GD06/products"
+```
 
 ---
 

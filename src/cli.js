@@ -70,6 +70,33 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'sets', 'en', 'index.json'), JSON.stringify(setIndex, null, 2));
   // Rulings (link-only: num/date/question + source_url; NOT the answer text)
   fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
+
+  // Products (SUPPLEMENTARY: a failure here must NEVER abort or degrade the card refresh).
+  // Cards + rulings are already written above, so anything below is safe to fail.
+  const productsPath = path.join(OUT, 'products.json');
+  let products = null;
+  try {
+    const { scrapeProducts } = require('./products-scraper');
+    products = await scrapeProducts();
+  } catch (err) {
+    console.error('Products scrape FAILED (supplementary; continuing):', err && err.message);
+    products = null;
+  }
+  if (products && products.length > 0) {
+    if (products.length < 10) console.warn(`WARNING: only ${products.length} products (baseline ~44-48) - possible partial scrape`);
+    fs.writeFileSync(productsPath, JSON.stringify(products, null, 0));
+    console.log(`Wrote products.json (${products.length} products)`);
+  } else {
+    // Zero-guard (mandatory): a 0-product scrape (likely a selector break) must NOT wipe an
+    // existing dataset wholesale. Keep the committed file if it has rows.
+    let existing = 0;
+    try { if (fs.existsSync(productsPath)) existing = JSON.parse(fs.readFileSync(productsPath, 'utf8')).length; } catch (_) {}
+    if (existing > 0) console.warn(`WARNING: products scrape yielded 0 but existing products.json has ${existing} rows - KEEPING existing file (zero-guard).`);
+    else { console.warn('WARNING: products scrape yielded 0 and no existing products.json - writing empty array.'); fs.writeFileSync(productsPath, JSON.stringify([], null, 0)); }
+  }
+  let productCount = 0;
+  try { if (fs.existsSync(productsPath)) productCount = JSON.parse(fs.readFileSync(productsPath, 'utf8')).length; } catch (_) {}
+
   // Manifest (consumers read this FIRST - never hardcode file URLs)
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
     schema_version: 1,
@@ -78,7 +105,8 @@ async function main() {
     card_count: cards.length,
     set_count: setIndex.length,
     ruling_count: rulings.length,
-    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json' },
+    product_count: productCount,
+    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json', products: 'data/products.json' },
     disclaimer: 'Not affiliated with Bandai. Gundam and card images are copyright Bandai.'
   }, null, 2));
 

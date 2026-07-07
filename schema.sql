@@ -84,3 +84,29 @@ CREATE TABLE IF NOT EXISTS usage_daily (
   count    INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (key_hash, day)
 );
+
+-- Official PRODUCTS (boosters, starter decks, accessories, promo products). SUPPLEMENTARY
+-- to cards: a products scrape failure never touches the cards table. Replaced wholesale by
+-- each import (like cards + rulings). Metadata only - image_url hotlinks the official image,
+-- never a rehosted byte; marketing prose is excluded (same posture as ruling answers).
+--   product_id       filename slug from product_url (gd06, st11, deck-case02); PRIMARY KEY
+--   category_tag     data-tags value (BOOSTERPACK, STARTERDECK, ACCESSORIES, ...); nullable
+--   set_code         [GD06]/[ST11] parsed from name; null for accessories (no bracket)
+--   release_date     ISO YYYY-MM-DD (nullable); release_date_raw keeps the verbatim source
+--   msrp/msrp_value  verbatim "$15.99" + parsed 15.99 (both null for unreleased "-")
+CREATE TABLE IF NOT EXISTS products (
+  product_id       TEXT PRIMARY KEY,
+  name             TEXT,
+  category_tag     TEXT,
+  category_label   TEXT,
+  set_code         TEXT,
+  release_date     TEXT,
+  release_date_raw TEXT,
+  msrp             TEXT,
+  msrp_value       REAL,
+  contents         TEXT,
+  image_url        TEXT,
+  product_url      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_products_set ON products(set_code);
+CREATE INDEX IF NOT EXISTS idx_products_tag ON products(category_tag);

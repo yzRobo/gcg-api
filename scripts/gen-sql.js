@@ -38,12 +38,21 @@ const setsSummary = [...setMap.values()].map(s => {
 }).sort((a, b) => a.set_code < b.set_code ? -1 : a.set_code > b.set_code ? 1 : 0);
 const rulingsPath = path.join(__dirname,'..','data','rulings.json');
 const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsPath,'utf8')) : [];
+// Products are SUPPLEMENTARY: an absent/empty products.json must NOT wipe the D1 products
+// table wholesale (the cli.js zero-guard keeps the file populated; this is the same guard at
+// the SQL layer). When present, they are replaced wholesale like cards + rulings.
+const productsPath = path.join(__dirname,'..','data','products.json');
+const products = fs.existsSync(productsPath) ? JSON.parse(fs.readFileSync(productsPath,'utf8')) : [];
 const metaRows = [
   ['dataset_version', process.env.DATASET_VERSION || new Date().toISOString().slice(0,10)],
   ['card_count', String(cards.length)],
   ['ruling_count', String(rulings.length)],
   ['sets_summary', JSON.stringify(setsSummary)]
 ];
+// product_count meta backs /v1/manifest (the ruling_count lesson: the manifest claim must be
+// backed by a meta row). Only written when products exist, to stay consistent with the guard
+// below that leaves the products table untouched on an empty file.
+if (products.length > 0) metaRows.push(['product_count', String(products.length)]);
 for (const [k, v] of metaRows) {
   sql += `INSERT INTO meta (key,value) VALUES ('${k}',${esc(v)}) ON CONFLICT(key) DO UPDATE SET value=excluded.value;\n`;
 }
@@ -55,8 +64,20 @@ for (let i = 0; i < rulings.length; i += 100) {
   sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +
     chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
 }
+// Products table (separate; supplementary metadata, replaced wholesale each run). Guarded on
+// products.length > 0 so an empty/missing products.json never emits a bare DELETE that would
+// wipe the table (SQL-layer half of the zero-guard; msrp_value is the only numeric column).
+const pcols = ['product_id','name','category_tag','category_label','set_code','release_date','release_date_raw','msrp','msrp_value','contents','image_url','product_url'];
+if (products.length > 0) {
+  sql += 'DELETE FROM products;\n';
+  for (let i = 0; i < products.length; i += 100) {
+    const chunk = products.slice(i, i + 100);
+    sql += `INSERT INTO products (${pcols.join(',')}) VALUES\n` +
+      chunk.map(p => `(${pcols.map(k => esc(p[k])).join(',')})`).join(',\n') + ';\n';
+  }
+}
 // Prune per-key usage counters older than 35 days (usage_daily is otherwise never touched by
 // the import - like api_keys - so keys and their history persist across weekly refreshes).
 sql += "DELETE FROM usage_daily WHERE day < date('now','-35 day');\n";
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
-console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings)`);
+console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings, ${products.length} products)`);
