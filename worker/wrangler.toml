@@ -9,12 +9,12 @@ routes = [
 ]
 
 [vars]
-DATASET_VERSION = "2026-07-06.8"        # manual seed; the M3 refresh job overrides per publish
-# Rolling Release asset — replaced on every publish, so always current.
+DATASET_VERSION = "2026-07-06.9"        # manual seed; the M3 refresh job overrides per publish
+# Rolling Release asset - replaced on every publish, so always current.
 # Do NOT use jsDelivr @latest here: it only resolves semver tags, and our tag (data-latest) is not semver.
 BULK_URL = "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.ndjson"
 # Cloudflare Turnstile SITE key (public; safe to commit). This default is Cloudflare's
-# "always passes" TESTING sitekey — replace with the real one after creating the widget
+# "always passes" TESTING sitekey - replace with the real one after creating the widget
 # in the dashboard (Part 10 setup). The matching SECRET is set via `wrangler secret put
 # TURNSTILE_SECRET` (never committed).
 TURNSTILE_SITEKEY = "0x4AAAAAADw6vR6JSEjXAD_i"
@@ -42,9 +42,9 @@ namespace_id = "1002"
   limit = 300
   period = 60
 
-# Secrets (NOT here — set via `wrangler secret put`). BOTH are REQUIRED for /register
+# Secrets (NOT here - set via `wrangler secret put`). BOTH are REQUIRED for /register
 # and POST /v1/keys to work; without them key registration returns HTTP 501 (fails closed):
-#   TURNSTILE_SECRET  — Turnstile secret key (server-side siteverify)
-#   IP_HASH_SALT      — random >=32-byte pepper for hashing CF-Connecting-IP before storage.
+#   TURNSTILE_SECRET  - Turnstile secret key (server-side siteverify)
+#   IP_HASH_SALT      - random >=32-byte pepper for hashing CF-Connecting-IP before storage.
 #                       Without it, stored created_ip_hash would be reversible to the raw IP,
 #                       so registration refuses to persist without it.

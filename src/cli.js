@@ -1,4 +1,4 @@
-// src/cli.js — scrape all packages, normalize, sanity-check, write artifacts.
+// src/cli.js - scrape all packages, normalize, sanity-check, write artifacts.
 const fs = require('fs');
 const path = require('path');
 const GundamScraper = require('./scraper');
@@ -15,7 +15,7 @@ async function main() {
   await assertScrapingAllowed(scraper.baseUrl, scraper.headers['User-Agent']);
 
   const packages = await scraper.getPackages();
-  if (packages.length === 0) throw new Error('SANITY: no packages found — site markup likely changed');
+  if (packages.length === 0) throw new Error('SANITY: no packages found - site markup likely changed');
   console.log(`Found ${packages.length} packages`);
 
   const byId = new Map();
@@ -41,17 +41,17 @@ async function main() {
   const rulings = [...rulingsByKey.values()];
 
   // ---- SANITY GATE (abort before writing anything if these fail) ----
-  if (cards.length < 1000) throw new Error(`SANITY: only ${cards.length} cards (<1000) — probable scrape failure`);
+  if (cards.length < 1000) throw new Error(`SANITY: only ${cards.length} cards (<1000) - probable scrape failure`);
   const blankNames = cards.filter(c => !c.name).length;
-  if (blankNames > cards.length * 0.02) throw new Error(`SANITY: ${blankNames} blank names — selector likely broke`);
+  if (blankNames > cards.length * 0.02) throw new Error(`SANITY: ${blankNames} blank names - selector likely broke`);
   // Card-type-aware: UNITs must have AP/HP; only assert on the fields a type actually has.
   const unitsMissingStats = cards.filter(c => /UNIT/i.test(c.card_type) && !/TOKEN/i.test(c.card_type) && (c.ap == null || c.hp == null)).length;
-  if (unitsMissingStats > cards.length * 0.05) throw new Error(`SANITY: ${unitsMissingStats} UNITs missing AP/HP — stat labels likely changed`);
+  if (unitsMissingStats > cards.length * 0.05) throw new Error(`SANITY: ${unitsMissingStats} UNITs missing AP/HP - stat labels likely changed`);
   // M5: structured keyword/timing extraction must be producing data (guards a silent effect-selector break).
   const cardsWithKeywords = cards.filter(c => (c.keyword_effects && c.keyword_effects.length) || (c.timing_markers && c.timing_markers.length)).length;
-  if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) — effect parsing likely broke`);
+  if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) - effect parsing likely broke`);
   const badTypeSep = cards.filter(c => /[・･]/.test(c.card_type)).length;
-  if (badTypeSep > 0) throw new Error(`SANITY: ${badTypeSep} cards still have a fullwidth-dot card_type separator — normalizeType broke`);
+  if (badTypeSep > 0) throw new Error(`SANITY: ${badTypeSep} cards still have a fullwidth-dot card_type separator - normalizeType broke`);
   console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets, ${rulings.length} rulings`);
 
   // ---- Write artifacts ----
@@ -70,7 +70,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'sets', 'en', 'index.json'), JSON.stringify(setIndex, null, 2));
   // Rulings (link-only: num/date/question + source_url; NOT the answer text)
   fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
-  // Manifest (consumers read this FIRST — never hardcode file URLs)
+  // Manifest (consumers read this FIRST - never hardcode file URLs)
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
     schema_version: 1,
     dataset_version: VERSION,

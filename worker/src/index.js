@@ -8,13 +8,13 @@ const DISCLAIMER = 'Not affiliated with Bandai. Gundam and card images are copyr
 
 // --- Rate-limit tiers (counters live in the wrangler.toml [[ratelimits]] bindings).
 // NOTE: the Workers Rate Limiting binding is per-Cloudflare-location (node-local, no
-// network hop), so these are approximate per-location ceilings, not hard global caps —
+// network hop), so these are approximate per-location ceilings, not hard global caps -
 // an accepted free-tier tradeoff (a global counter would need a Durable Object/KV hop). ---
 const ANON_LIMIT = 60;        // ~requests / minute / IP   (RL_ANON)
 const KEYED_LIMIT = 300;      // ~requests / minute / key  (RL_KEYED)
 const MAX_KEYS_PER_IP = 3;    // active (non-revoked) self-serve keys per IP
 
-// Cloudflare Turnstile test credentials (only valid in dev) — warn if seen in production.
+// Cloudflare Turnstile test credentials (only valid in dev) - warn if seen in production.
 const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '3x00000000000000000000FF'];
 
 // Only these query params affect a response body; the cache key is built from them
@@ -115,12 +115,12 @@ export default {
         note: 'Limits are enforced per Cloudflare location, so this is an approximate ceiling.',
         hint: actor.tier === 'anon'
           ? 'Register a free key at /register for a higher limit, or use the bulk Release files for large pulls.'
-          : 'Slow down — the keyed limit is about 300 requests/minute.',
+          : 'Slow down - the keyed limit is about 300 requests/minute.',
         disclaimer: DISCLAIMER
       }, 429, { 'Retry-After': '60', 'Cache-Control': 'no-store' }); // 429s carry Retry-After and are never cached
     }
 
-    // Per-key daily usage counter — keyed requests only (anonymous traffic is never tracked).
+    // Per-key daily usage counter - keyed requests only (anonymous traffic is never tracked).
     // Fire-and-forget: adds no latency, silently undercounts if the D1 write budget is ever hit.
     if (actor.tier === 'keyed' && actor.keyHash) {
       ctx.waitUntil(env.DB.prepare(
@@ -232,7 +232,7 @@ async function createKey(request, env) {
     created_at: createdAt,
     tier: 'keyed',
     rate_limit_per_minute: KEYED_LIMIT,
-    usage: 'Send this key in the "X-API-Key" request header. Store it now — it is shown only once and cannot be recovered.',
+    usage: 'Send this key in the "X-API-Key" request header. Store it now - it is shown only once and cannot be recovered.',
     note: `Anonymous access (no key) is limited to about ${ANON_LIMIT} requests/minute per IP (enforced per Cloudflare location). For bulk data, download the Release files instead of paging the API.`
   }, 201);
 }
@@ -391,7 +391,7 @@ async function route(url, env, version) {
     return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
   }
 
-  // Redirect bulk downloads to the rolling Release asset — no Worker compute.
+  // Redirect bulk downloads to the rolling Release asset - no Worker compute.
   // BULK_URL is config, not code: it lives in wrangler.toml [vars] (the Workers env).
   if (p === '/v1/bulk') {
     if (!env.BULK_URL) return json({ error: 'BULK_URL not configured' }, 501);

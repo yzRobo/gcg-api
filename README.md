@@ -7,7 +7,7 @@ JSON/NDJSON files and (b) a free read-only REST API.
 > **Not affiliated with Bandai.** This project is not produced by, endorsed by, supported by,
 > or affiliated with Bandai. Gundam and all related card names, effect text, artwork, and
 > trademarks are the property of Bandai and its licensors. This project stores only factual
-> metadata and **never hosts card images** — `image_url` points at Bandai's own servers.
+> metadata and **never hosts card images** - `image_url` points at Bandai's own servers.
 
 - **API base URL:** `https://api.gcgapi.com`
 - **Interactive docs:** https://api.gcgapi.com/docs
@@ -37,7 +37,7 @@ curl "https://api.gcgapi.com/v1/sets"
 ```
 
 **The files are the source of truth; the API is a convenience over them.** If the API is ever
-retired, the dataset still lives in the repo and Releases — nobody is stranded.
+retired, the dataset still lives in the repo and Releases - nobody is stranded.
 
 ---
 
@@ -71,7 +71,7 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | `GET /v1/manifest` | Dataset version, card count, bulk URL |
 | `GET /v1/bulk` | 302 redirect to the full NDJSON dataset |
 | `GET /register` | Self-serve free API key page |
-| `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) — send `X-API-Key`; never cached |
+| `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) - send `X-API-Key`; never cached |
 
 `GET /v1/cards` query parameters (combine freely):
 
@@ -111,7 +111,7 @@ List responses wrap results as `{ "_meta": { total, limit, offset, count, discla
 | `block_icon` | string \| null | |
 | `sp` | string \| null | |
 | `effect` | string | card text; newlines preserved |
-| `image_url` | string | absolute `gundam-gcg.com` URL — **not** rehosted here |
+| `image_url` | string | absolute `gundam-gcg.com` URL - **not** rehosted here |
 | `detail_url` | string \| null | source detail page |
 | `keyword_effects` | array | keyword abilities parsed from `effect`, e.g. `[{"keyword":"Repair","value":1}]` |
 | `timing_markers` | array | effect timing tokens, e.g. `["Burst","Main"]` |
@@ -151,7 +151,7 @@ these if you depend on currency.
 
 - **Code** (scraper, normalizer, CLI, D1 schema, Worker): [MIT](LICENSE).
 - **Data compilation** (the selection/arrangement of factual fields only): [CC0 1.0](LICENSE-DATA)
-  — public domain, no attribution required (though a credit to `gcg-api` is appreciated).
+  - public domain, no attribution required (though a credit to `gcg-api` is appreciated).
 
 Neither license grants any rights in Bandai's card names, effect text, artwork, or trademarks.
 See [`LICENSE-DATA`](LICENSE-DATA) for the scope.

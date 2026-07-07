@@ -1,4 +1,4 @@
--- schema.sql — Cloudflare D1 schema. Run ONCE at setup:
+-- schema.sql - Cloudflare D1 schema. Run ONCE at setup:
 --   npx wrangler d1 execute gundam-cards --remote --file schema.sql
 -- (Vercel analogy: this is your one-time table setup, like an initial SQL migration.)
 
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE INDEX IF NOT EXISTS idx_api_keys_ip ON api_keys(created_ip_hash);
 
 -- Official per-card FAQ rulings (M5). LINK-ONLY posture: number, date, and question text,
--- plus source_url back to the official page — the answer prose (Bandai copyright) is NOT stored.
+-- plus source_url back to the official page - the answer prose (Bandai copyright) is NOT stored.
 -- Replaced wholesale by each import (like cards); exposed via /v1/cards/:id?include=rulings.
 CREATE TABLE IF NOT EXISTS rulings (
   card_number TEXT,

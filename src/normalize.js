@@ -1,4 +1,4 @@
-// src/normalize.js — map a raw scraped card onto the clean public schema.
+// src/normalize.js - map a raw scraped card onto the clean public schema.
 
 // --- M5 structured extraction helpers (derive machine-readable fields from text) ---
 
@@ -20,7 +20,7 @@ function extractKeywordEffects(effect) {
 // Effect timing/type markers appear in fullwidth lenticular brackets, sometimes compounded
 // with a middle dot (either U+30FB or U+FF65): 【Burst】, 【Activate･Main】, 【When Paired】.
 // The compounds also carry pilot/trait CONDITIONS (e.g. "(Coordinator) Pilot", "Development 2")
-// which are not timings — so keep only tokens in the known timing vocabulary and leave the
+// which are not timings - so keep only tokens in the known timing vocabulary and leave the
 // rest in the effect text.
 const TIMING_KEYWORDS = ['Activate', 'Main', 'Action', 'Burst', 'Deploy', 'Attack', 'Destroyed', 'When Paired', 'During Pair', 'When Linked', 'During Link', 'Once per Turn'];
 const TIMING_SET = new Set(TIMING_KEYWORDS.map((s) => s.toLowerCase()));

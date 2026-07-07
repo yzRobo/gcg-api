@@ -1,4 +1,4 @@
-// src/scraper.js — Scraper for the official Gundam Card Game site.
+// src/scraper.js - Scraper for the official Gundam Card Game site.
 // No public JSON API exists, so card data is scraped from
 // https://www.gundam-gcg.com/en/cards: discover "packages" (sets), then pull
 // the cards for each. A package's card list comes from a POST to index.php;
@@ -24,7 +24,7 @@ async function fetchWithRetry(fn, { attempts = 3, baseDelay = 600 } = {}) {
 class GundamScraper {
   constructor(options = {}) {
     this.baseUrl = 'https://www.gundam-gcg.com/en/cards';
-    // Descriptive, attributing User-Agent — swap the URL for THIS project's repo.
+    // Descriptive, attributing User-Agent - swap the URL for THIS project's repo.
     this.headers = {
       'User-Agent': options.userAgent ||
         'Mozilla/5.0 (gundam-card-data/1.0.0; +https://github.com/yzRobo/gcg-api)',
@@ -106,7 +106,7 @@ class GundamScraper {
 
     // FAQ / rulings block on the same page. Link-only per project posture: capture the
     // number, date, and question (short, identifying), but NOT the answer prose (Bandai
-    // copyright) — consumers follow detail_url to the official answer.
+    // copyright) - consumers follow detail_url to the official answer.
     const rulings = [];
     $('.cardQaCol .qaCol').each((i, el) => {
       const num = $(el).find('.qaColNum').text().replace(/\s+/g, ' ').trim();

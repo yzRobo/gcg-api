@@ -1,9 +1,9 @@
-// src/robots.js — good-faith robots.txt precheck.
+// src/robots.js - good-faith robots.txt precheck.
 //
 // Added per the M0 ToS go/no-go decision (rider 3): the site has NO robots.txt
 // today (https://www.gundam-gcg.com/robots.txt returns 404). If one ever appears
-// and disallows the cards path for our user-agent, we abort the scrape loudly —
-// exactly like a sanity-gate failure — rather than crawl against an explicit
+// and disallows the cards path for our user-agent, we abort the scrape loudly -
+// exactly like a sanity-gate failure - rather than crawl against an explicit
 // exclusion. A 404 / missing / unparseable robots.txt means "no restriction" and
 // we proceed. This does NOT touch scraper.js logic, selectors, or rate limits.
 const axios = require('axios');
@@ -41,7 +41,7 @@ function parseRobots(text) {
       current.rules.push({ type: field, value });
       lastWasAgent = false;
     } else {
-      lastWasAgent = false; // sitemap, crawl-delay, host, etc. — irrelevant to allow/disallow
+      lastWasAgent = false; // sitemap, crawl-delay, host, etc. - irrelevant to allow/disallow
     }
   }
   return groups;
@@ -87,14 +87,14 @@ async function assertScrapingAllowed(baseUrl, userAgent) {
       timeout: 15000,
       validateStatus: () => true
     });
-    if (resp.status === 404) { console.log(`robots.txt: 404 (none present) at ${robotsUrl} — scraping allowed.`); return; }
+    if (resp.status === 404) { console.log(`robots.txt: 404 (none present) at ${robotsUrl} - scraping allowed.`); return; }
     if (resp.status !== 200 || typeof resp.data !== 'string') {
-      console.log(`robots.txt: HTTP ${resp.status} at ${robotsUrl} (no parseable rules) — proceeding.`);
+      console.log(`robots.txt: HTTP ${resp.status} at ${robotsUrl} (no parseable rules) - proceeding.`);
       return;
     }
     text = resp.data;
   } catch (err) {
-    console.log(`robots.txt: fetch failed (${err.message}) — proceeding (no rules to honor).`);
+    console.log(`robots.txt: fetch failed (${err.message}) - proceeding (no rules to honor).`);
     return;
   }
 
@@ -103,11 +103,11 @@ async function assertScrapingAllowed(baseUrl, userAgent) {
   const blocked = paths.find((p) => !isPathAllowed(rules, p));
   if (blocked) {
     throw new Error(
-      `ROBOTS: robots.txt at ${robotsUrl} now disallows "${blocked}" for our user-agent — ` +
+      `ROBOTS: robots.txt at ${robotsUrl} now disallows "${blocked}" for our user-agent - ` +
       `aborting scrape to honor the exclusion. Review the file before scraping again.`
     );
   }
-  console.log(`robots.txt: present at ${robotsUrl} and allows ${cardsPath} — OK.`);
+  console.log(`robots.txt: present at ${robotsUrl} and allows ${cardsPath} - OK.`);
 }
 
 module.exports = { assertScrapingAllowed, parseRobots, rulesForAgent, isPathAllowed };

@@ -1,4 +1,4 @@
-// scripts/gen-sql.js — generate data/import.sql from data/cards.ndjson
+// scripts/gen-sql.js - generate data/import.sql from data/cards.ndjson
 const fs = require('fs');
 const path = require('path');
 const cards = fs.readFileSync(path.join(__dirname,'..','data','cards.ndjson'),'utf8').trim().split('\n').map(JSON.parse);
@@ -7,7 +7,7 @@ const JSON_COLS = new Set(['traits','link_refs','keyword_effects','timing_marker
 const cell = (c, k) => JSON_COLS.has(k) ? JSON.stringify(c[k] || []) : c[k];
 const esc = (v) => v == null ? 'NULL' : (typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g,"''")}'`);
 let sql = 'DELETE FROM cards;\n';
-for (let i = 0; i < cards.length; i += 40) {                     // 40 rows per INSERT — D1 caps a single SQL statement at ~100 KB; effect + new JSON columns add up
+for (let i = 0; i < cards.length; i += 40) {                     // 40 rows per INSERT - D1 caps a single SQL statement at ~100 KB; effect + new JSON columns add up
   const chunk = cards.slice(i, i + 40);
   sql += `INSERT INTO cards (${cols.join(',')}) VALUES\n` +
     chunk.map(c => `(${cols.map(k => esc(cell(c, k))).join(',')})`).join(',\n') + ';\n';
@@ -26,7 +26,7 @@ for (const c of cards) {
 // Canonical set_name = the MOST COMMON name for that set_code. A set_code (e.g. GD01)
 // contains its main-package cards (set_name "Newtype Rising") plus promo cards that share
 // the GD01-### numbering but carry the generic promo package name ("Promotion card").
-// The main package always dominates by count, so mode picks the real name — unlike SQL
+// The main package always dominates by count, so mode picks the real name - unlike SQL
 // MAX(set_name), which wrongly picks "Promotion card" for sets whose name sorts before it.
 // Tie-break: lexicographically smallest.
 const setsSummary = [...setMap.values()].map(s => {
@@ -56,7 +56,7 @@ for (let i = 0; i < rulings.length; i += 100) {
     chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
 }
 // Prune per-key usage counters older than 35 days (usage_daily is otherwise never touched by
-// the import — like api_keys — so keys and their history persist across weekly refreshes).
+// the import - like api_keys - so keys and their history persist across weekly refreshes).
 sql += "DELETE FROM usage_daily WHERE day < date('now','-35 day');\n";
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
 console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings)`);

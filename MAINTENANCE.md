@@ -12,7 +12,7 @@ that keeps it defensible:
   Do not add image rehosting or an image proxy on by default.
 - Card **names** and **effect text** are creative expression, not pure facts. The metadata-only,
   no-image-bytes stance is the real risk reducer.
-- Data compilation is **CC0**, scoped to factual fields only (see `LICENSE-DATA`) — it does not
+- Data compilation is **CC0**, scoped to factual fields only (see `LICENSE-DATA`) - it does not
   purport to license Bandai's IP.
 - The **non-affiliation disclaimer** appears in the README, every successful (`_meta`-bearing)
   API response, `/docs`, the OpenAPI spec, and this file. Keep it on all these surfaces.
@@ -31,10 +31,10 @@ files to remove.
 
 1. **Silent selector breakage is the top risk.** The scraper is coupled to `gundam-gcg.com`
    markup; a redesign returns empty arrays/blank fields, not errors. The **sanity gate** in
-   `src/cli.js` is the guard — it aborts the run (non-zero exit fails CI) rather than publish
+   `src/cli.js` is the guard - it aborts the run (non-zero exit fails CI) rather than publish
    garbage. Keep it strict but card-type-aware: only UNITs have AP/HP; COMMAND/RESOURCE/PILOT
    don't; colorless cards legitimately have `color = null`.
-2. **A stale dataset looks trustworthy** — worse than an obviously-broken one. `dataset_version`
+2. **A stale dataset looks trustworthy** - worse than an obviously-broken one. `dataset_version`
    (live, in `/v1/manifest`) and `built_at` (in `data/manifest.json`) surface freshness. Consider
    an alert if the last successful build is older than N days.
 3. **Rate / politeness.** Hardened to **3 concurrent / 400 ms between batches + retry/backoff**.
@@ -46,7 +46,7 @@ files to remove.
 5. **Alt-arts** share a `card_number` but differ by `product_id` (`_p1`/`_p2` suffix). `product_id`
    is the real natural key. `/v1/cards/{card_number}` returns the base printing (sorts before `_p1`).
 6. **Bulk freshness.** `BULK_URL` points at the rolling GitHub Release asset
-   (`releases/download/data-latest/cards.ndjson`), replaced on every publish — always current.
+   (`releases/download/data-latest/cards.ndjson`), replaced on every publish - always current.
    Do not use jsDelivr `@latest`; it only resolves semver tags and our tag is `data-latest`.
 7. **CI reachability.** GitHub-hosted runners use shared cloud IPs some sites block. Verified
    working as of the first run; if a future run 403s from CI but works locally, the fallback is
@@ -57,7 +57,7 @@ files to remove.
    `(...)`/`[...]` groups. The `cli.js` sanity gate asserts >=30% of cards carry keyword/timing
    data, so a formatting change fails loudly. Known source quirk: GD02-053 renders `[Suppression]`
    in square brackets (a typo) instead of `<Suppression>`, so that one mention is not captured as
-   a keyword — leave it; do not loosen the regex to square brackets (square brackets are used for
+   a keyword - leave it; do not loosen the regex to square brackets (square brackets are used for
    pilot-name links and would produce false keyword hits). JSON-array columns (`keyword_effects`,
    `timing_markers`, `traits`, `link_refs`) are stored as TEXT and MUST be `JSON.parse`d by the
    Worker's `hydrate()` before returning, since every card route does `SELECT *`.
@@ -83,8 +83,8 @@ files to remove.
   `TURNSTILE_SITEKEY` (public), plus the `[[ratelimits]]` bindings and the `api.gcgapi.com`
   `custom_domain` route. `database_id` is not a secret.
 - Worker secrets (via `wrangler secret put`, never committed):
-  - `TURNSTILE_SECRET` — Turnstile server-side siteverify secret.
-  - `IP_HASH_SALT` — random >=32-byte pepper for hashing `CF-Connecting-IP` before storage.
+  - `TURNSTILE_SECRET` - Turnstile server-side siteverify secret.
+  - `IP_HASH_SALT` - random >=32-byte pepper for hashing `CF-Connecting-IP` before storage.
     **Required**: registration returns 501 without it (refuses to store a reversible IP hash).
 - GitHub Actions secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts + D1 + Workers Routes edit),
   `CLOUDFLARE_ACCOUNT_ID`.
@@ -96,14 +96,14 @@ files to remove.
   hash (`created_ip_hash`).
 - Tiers: keyless ~60/min (`RL_ANON`, by IP), keyed ~300/min (`RL_KEYED`, by key hash). Invalid/
   revoked/unknown keys fall back to anonymous limits (never 401). Limits are per-Cloudflare-colo
-  (node-local counters) by design — approximate global ceilings, an accepted free-tier tradeoff.
+  (node-local counters) by design - approximate global ceilings, an accepted free-tier tradeoff.
 - The `api_keys` table is **never** rewritten by the weekly import, so keys persist across
   refreshes. (`import.sql` rewrites `cards`, `meta`, and `rulings`; it only PRUNES `usage_daily`.)
 - **Usage / `/v1/me`.** `usage_daily` (key_hash, day, count) is incremented fire-and-forget on
-  KEYED requests only — anonymous traffic is never tracked (privacy + keeps D1 writes tiny). It
+  KEYED requests only - anonymous traffic is never tracked (privacy + keeps D1 writes tiny). It
   is undercount-tolerant (a dropped write is a courtesy-dashboard miss, not billing) and pruned
   to 35 days by gen-sql. `/v1/me` is handled BEFORE the edge cache and sent `Cache-Control:
-  no-store` — per-key data must never enter the shared cache (one caller's usage served to
+  no-store` - per-key data must never enter the shared cache (one caller's usage served to
   another). Per-minute remaining is intentionally not exposed (the rate-limit binding has no
   readable counter, and a per-minute figure resets before it is actionable).
 
@@ -126,4 +126,4 @@ recent value, or a stale entry under that key can be served again). Cache is act
 
 Richer, cleanly-licensed fields that competitors lack: ban/limit lists, errata, keyword/ability
 taxonomies. These would move the project from matching existing datasets to beating them. Keep the
-metadata-only posture — do not add image hosting.
+metadata-only posture - do not add image hosting.
