@@ -20,6 +20,11 @@
     "card_count": 194
   },
   {
+    "set_code": "GD05",
+    "set_name": "Freedom Ascension",
+    "card_count": 132
+  },
+  {
     "set_code": "ST01",
     "set_name": "Heroic Beginnings",
     "card_count": 35
@@ -73,6 +78,11 @@
     "set_code": "EB01",
     "set_name": "Eternal Nexus",
     "card_count": 108
+  },
+  {
+    "set_code": "SC01",
+    "set_name": "Deck Build Box Freedom Ascension",
+    "card_count": 48
   },
   {
     "set_code": null,
