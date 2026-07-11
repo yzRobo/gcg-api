@@ -2,7 +2,7 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key'
+  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, Authorization'
 };
 const DISCLAIMER = 'Not affiliated with Bandai. Gundam and card images are copyright Bandai.';
 
@@ -60,11 +60,22 @@ async function ipHash(request, env) {
   return sha256Hex(`${salt}:${clientIp(request)}`);
 }
 
-// Identify the actor for rate limiting. A valid, non-revoked X-API-Key -> keyed tier
+// Extract a presented API key: X-API-Key, or an Authorization: Bearer token. Both are
+// accepted so generic HTTP clients work without knowing the custom header; X-API-Key wins
+// if both are sent.
+function presentedKey(request) {
+  const direct = request.headers.get('X-API-Key');
+  if (direct) return direct;
+  const auth = request.headers.get('Authorization');
+  const m = auth && auth.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
+// Identify the actor for rate limiting. A valid, non-revoked key -> keyed tier
 // (one indexed point read); anything else -> anonymous tier keyed by IP hash (no D1 read).
 // Any DB error falls back to anonymous (fail-safe: never hand out keyed limits on error).
 async function identify(request, env) {
-  const presented = request.headers.get('X-API-Key');
+  const presented = presentedKey(request);
   if (presented) {
     try {
       const keyHash = await sha256Hex(presented);
@@ -234,7 +245,7 @@ async function createKey(request, env) {
     created_at: createdAt,
     tier: 'keyed',
     rate_limit_per_minute: KEYED_LIMIT,
-    usage: 'Send this key in the "X-API-Key" request header. Store it now - it is shown only once and cannot be recovered.',
+    usage: 'Send this key in the "X-API-Key" request header (or as an "Authorization: Bearer" token). Store it now - it is shown only once and cannot be recovered.',
     note: `Anonymous access (no key) is limited to about ${ANON_LIMIT} requests/minute per IP (enforced per Cloudflare location). For bulk data, download the Release files instead of paging the API.`
   }, 201);
 }
@@ -243,7 +254,7 @@ async function createKey(request, env) {
 // per-key data must never enter the shared edge cache (one caller's usage served to another). ----
 async function meHandler(request, env, url) {
   const noStore = { 'Cache-Control': 'no-store' };
-  const presented = request.headers.get('X-API-Key');
+  const presented = presentedKey(request);
   let keyRow = null, keyHash = null;
   if (presented) {
     try {
@@ -646,7 +657,7 @@ function openapiSpec(url) {
         get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
       '/v1/me': {
-        get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key; response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
+        get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key (or Authorization: Bearer); response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
       },
       '/v1/bulk': {
         get: { tags: ['meta'], summary: 'Redirect (302) to the full NDJSON dataset on the GitHub Release', responses: { '302': { description: 'Redirect to the bulk file' } } }
@@ -665,7 +676,10 @@ function openapiSpec(url) {
     },
     components: {
       schemas: { Card: CARD_SCHEMA, Product: PRODUCT_SCHEMA },
-      securitySchemes: { ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Optional. Raises the rate limit from ~60 to ~300 requests/minute.' } }
+      securitySchemes: {
+        ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key', description: 'Optional. Raises the rate limit from ~60 to ~300 requests/minute.' },
+        BearerAuth: { type: 'http', scheme: 'bearer', description: 'Alternative to X-API-Key: the same key sent as a Bearer token. X-API-Key wins if both are present.' }
+      }
     }
   };
 }
@@ -759,7 +773,7 @@ function docsPage(url) {
   <h2>Rate limits &amp; keys <a class="anchor" href="#limits" aria-label="Link to this section">#</a></h2>
   <ul>
     <li><b>Keyless</b>: up to ~${ANON_LIMIT} requests/minute per IP. No signup.</li>
-    <li><b>Free key</b>: up to ~${KEYED_LIMIT} requests/minute. Get one at <a href="${base}/register">/register</a> and send it as the <code>X-API-Key</code> header.</li>
+    <li><b>Free key</b>: up to ~${KEYED_LIMIT} requests/minute. Get one at <a href="${base}/register">/register</a> and send it as the <code>X-API-Key</code> header (or as an <code>Authorization: Bearer</code> token).</li>
   </ul>
   <p class="muted">Limits are enforced per Cloudflare location, so they are approximate ceilings. Over the limit returns <code>429</code> with a <code>Retry-After</code> header.</p>
   <p>Check a key's status and usage at <code>/v1/me</code> (send the key as <code>X-API-Key</code>): active/revoked, tier, limit, and request counts for today / last 7 days / last 30 days. Usage is counted per key per day; anonymous traffic is never tracked. Per-minute remaining is not queryable by design. A browser version lives at <a href="https://gcgapi.com/key">gcgapi.com/key</a>.</p>

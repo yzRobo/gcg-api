@@ -47,7 +47,7 @@ retired, the dataset still lives in the repo and Releases - nobody is stranded.
 | Tier | Limit | How |
 |---|---|---|
 | Keyless | ~60 requests / minute / IP | no signup |
-| Free key | ~300 requests / minute | get one at [`/register`](https://api.gcgapi.com/register), send it as the `X-API-Key` header |
+| Free key | ~300 requests / minute | get one at [`/register`](https://api.gcgapi.com/register), send it as the `X-API-Key` header or an `Authorization: Bearer` token |
 
 Keys are optional and free. Register in a browser (a Cloudflare Turnstile challenge), copy the
 `gcd_...` key (shown once), and send it as a header:
@@ -75,7 +75,7 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | `GET /v1/manifest` | Dataset version, card/ruling/product counts, bulk URL |
 | `GET /v1/bulk` | 302 redirect to the full NDJSON dataset |
 | `GET /register` | Self-serve free API key page |
-| `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) - send `X-API-Key`; never cached |
+| `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) - send `X-API-Key` (or `Authorization: Bearer`); never cached |
 
 `GET /v1/cards` query parameters (combine freely):
 
