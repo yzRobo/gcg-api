@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gundam TCG API - free Gundam Card Game card dataset | gcg-api</title>
-<meta name="description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings, weekly refresh. No key required.">
+<title>Gundam Card Game API - free Gundam TCG card data in JSON</title>
+<meta name="description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, set and official ruling as JSON, refreshed weekly. No key required.">
 <meta name="theme-color" content="#0c0f12">
 <link rel="canonical" href="https://gcgapi.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="gcg-api">
 <meta property="og:locale" content="en_US">
-<meta property="og:title" content="Gundam TCG API - free Gundam Card Game card dataset">
-<meta property="og:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings, weekly refresh. No key required.">
+<meta property="og:title" content="Gundam Card Game API - free Gundam TCG card data in JSON">
+<meta property="og:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, set and official ruling as JSON, refreshed weekly. No key required.">
 <meta property="og:url" content="https://gcgapi.com/">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Gundam TCG API - free Gundam Card Game card dataset">
-<meta name="twitter:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings.">
+<meta name="twitter:title" content="Gundam Card Game API - free Gundam TCG card data in JSON">
+<meta name="twitter:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, set and official ruling as JSON, refreshed weekly.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 <script type="application/ld+json">
@@ -23,38 +23,163 @@
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Person",
+      "@id": "https://gcgapi.com/#publisher",
+      "name": "yzRobo",
+      "url": "https://github.com/yzRobo",
+      "sameAs": [
+        "https://github.com/yzRobo"
+      ]
+    },
+    {
       "@type": "WebSite",
       "@id": "https://gcgapi.com/#website",
       "url": "https://gcgapi.com/",
       "name": "gcg-api",
       "description": "Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG).",
-      "inLanguage": "en"
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://gcgapi.com/#publisher"
+      }
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://gcgapi.com/#webpage",
+      "url": "https://gcgapi.com/",
+      "name": "Gundam Card Game API - free Gundam TCG card data in JSON",
+      "isPartOf": {
+        "@id": "https://gcgapi.com/#website"
+      },
+      "inLanguage": "en",
+      "mainEntity": {
+        "@id": "https://gcgapi.com/#dataset"
+      }
     },
     {
       "@type": "Dataset",
       "@id": "https://gcgapi.com/#dataset",
       "name": "gcg-api - Gundam Card Game (Gundam TCG) card dataset",
-      "description": "Every card in Bandai's Gundam Card Game as structured JSON: card numbers, set codes, rarity, colors, levels, costs, AP/HP, parsed keyword abilities and timing markers, plus links to the official per-card FAQ rulings and product metadata. Refreshed weekly from the official card database. Metadata only - card images are hotlinked to Bandai, never rehosted.",
+      "alternateName": [
+        "Gundam TCG card dataset",
+        "gcg-api dataset"
+      ],
+      "description": "Every card in Bandai's Gundam Card Game as structured JSON: card numbers, set codes, rarity, colors, levels, costs, AP/HP, parsed keyword abilities and timing markers, plus official per-card FAQ rulings and product metadata. Rebuilt weekly from the official card database. Metadata only - card images are hotlinked to Bandai, never rehosted.",
       "url": "https://gcgapi.com/",
+      "sameAs": "https://github.com/yzRobo/gcg-api",
+      "identifier": "https://github.com/yzRobo/gcg-api",
+      "isBasedOn": "https://www.gundam-gcg.com/en/cards",
       "license": "https://opendatacommons.org/licenses/odbl/1-0/",
       "isAccessibleForFree": true,
       "inLanguage": "en",
-      "isBasedOn": "https://www.gundam-gcg.com/en/cards",
-      "sameAs": "https://github.com/yzRobo/gcg-api",
-      "creator": { "@type": "Person", "name": "yzRobo", "url": "https://github.com/yzRobo" },
-      "keywords": ["Gundam TCG", "Gundam Card Game", "GCG", "trading card game", "card database", "card game API", "open data", "JSON", "NDJSON"],
+      "creator": {
+        "@id": "https://gcgapi.com/#publisher"
+      },
+      "publisher": {
+        "@id": "https://gcgapi.com/#publisher"
+      },
+      "temporalCoverage": "2024-12-07/..",
+      "keywords": [
+        "Gundam Card Game",
+        "Gundam TCG",
+        "GCG",
+        "trading card game",
+        "card database",
+        "card game API",
+        "open data",
+        "JSON",
+        "NDJSON"
+      ],
+      "measurementTechnique": "Automated weekly extraction and parsing of Bandai's official Gundam Card Game card database",
+      "variableMeasured": [
+        {
+          "@type": "PropertyValue",
+          "name": "card_number",
+          "description": "Official card number, for example GD01-001."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "set_code",
+          "description": "Set/product code the card belongs to."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "rarity",
+          "description": "Printed rarity code."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "color",
+          "description": "Card color."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "level",
+          "description": "Level (deployment cost tier)."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "cost",
+          "description": "Resource cost to play the card."
+        }
+      ],
       "distribution": [
         {
           "@type": "DataDownload",
-          "name": "Full card dataset (NDJSON)",
+          "name": "All cards (NDJSON)",
           "encodingFormat": "application/x-ndjson",
           "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.ndjson"
         },
         {
           "@type": "DataDownload",
-          "name": "Full card dataset (JSON)",
+          "name": "All cards (JSON)",
           "encodingFormat": "application/json",
           "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.json"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "Official rulings (JSON)",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/rulings.json"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "Products (JSON)",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/products.json"
+        }
+      ],
+      "hasPart": [
+        {
+          "@type": "Dataset",
+          "@id": "https://gcgapi.com/#dataset-rulings",
+          "name": "gcg-api - Gundam Card Game official rulings",
+          "description": "Official Bandai FAQ rulings for the Gundam Card Game, linked to the cards they apply to, extracted weekly from the official card database.",
+          "license": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "isAccessibleForFree": true,
+          "creator": {
+            "@id": "https://gcgapi.com/#publisher"
+          },
+          "distribution": {
+            "@type": "DataDownload",
+            "encodingFormat": "application/json",
+            "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/rulings.json"
+          }
+        },
+        {
+          "@type": "Dataset",
+          "@id": "https://gcgapi.com/#dataset-products",
+          "name": "gcg-api - Gundam Card Game product releases",
+          "description": "Product and release metadata for the Gundam Card Game: booster packs, starter decks and accessories with release dates, set codes and contents.",
+          "license": "https://opendatacommons.org/licenses/odbl/1-0/",
+          "isAccessibleForFree": true,
+          "creator": {
+            "@id": "https://gcgapi.com/#publisher"
+          },
+          "distribution": {
+            "@type": "DataDownload",
+            "encodingFormat": "application/json",
+            "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/products.json"
+          }
         }
       ]
     },
@@ -65,8 +190,24 @@
       "description": "Read-only REST API for Gundam Card Game (Gundam TCG) cards, sets, products and official rulings. No key required; a free key raises the rate limit.",
       "url": "https://api.gcgapi.com/",
       "documentation": "https://api.gcgapi.com/docs",
-      "isAccessibleForFree": true,
-      "provider": { "@type": "Person", "name": "yzRobo", "url": "https://github.com/yzRobo" }
+      "termsOfService": "https://github.com/yzRobo/gcg-api/blob/main/LICENSE-DATA",
+      "provider": {
+        "@id": "https://gcgapi.com/#publisher"
+      },
+      "serviceType": "Read-only public REST API",
+      "areaServed": "Worldwide",
+      "availableChannel": {
+        "@type": "ServiceChannel",
+        "serviceUrl": "https://api.gcgapi.com/v1/cards"
+      },
+      "serviceOutput": {
+        "@id": "https://gcgapi.com/#dataset"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
     }
   ]
 }
@@ -88,7 +229,7 @@
 
   <section class="hero">
     <div class="hero-copy">
-      <h1>The Gundam Card Game, in JSON.</h1>
+      <h1>The Gundam Card Game API, in JSON.</h1>
       <p class="lede">gcg-api is a free, open dataset and REST API for Bandai's Gundam Card Game - the Gundam TCG - scraped weekly from the official card database, served from the edge, no key required.</p>
       <div class="actions">
         <a class="btn primary" href="https://api.gcgapi.com/docs">Read the docs</a>

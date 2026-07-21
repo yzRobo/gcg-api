@@ -1,4 +1,5 @@
-User-agent: *
-Allow: /
-
+# Cloudflare's managed robots.txt (AI Crawl Control / content signals) is PREPENDED to this
+# file at the edge, and it already emits a "User-agent: *" group with Allow: /. Declaring a
+# second "User-agent: *" group here would make the served file malformed, so this file carries
+# only the group-independent Sitemap directive.
 Sitemap: https://gcgapi.com/sitemap.xml
