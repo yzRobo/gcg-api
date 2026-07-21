@@ -3,19 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gcg-api - Gundam Card Game data &amp; API</title>
-<meta name="description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game. Every card, structured effects, official rulings. No key required.">
+<title>Gundam TCG API - free Gundam Card Game card dataset | gcg-api</title>
+<meta name="description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings, weekly refresh. No key required.">
 <meta name="theme-color" content="#0c0f12">
 <link rel="canonical" href="https://gcgapi.com/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="gcg-api - Gundam Card Game data &amp; API">
-<meta property="og:description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game. Every card, structured effects, official rulings. No key required.">
+<meta property="og:site_name" content="gcg-api">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Gundam TCG API - free Gundam Card Game card dataset">
+<meta property="og:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings, weekly refresh. No key required.">
 <meta property="og:url" content="https://gcgapi.com/">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="gcg-api - Gundam Card Game data &amp; API">
-<meta name="twitter:description" content="Free, open, weekly-refreshed dataset and REST API for the Gundam Card Game.">
+<meta name="twitter:title" content="Gundam TCG API - free Gundam Card Game card dataset">
+<meta name="twitter:description" content="Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG). Every card, structured effects, official rulings.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://gcgapi.com/#website",
+      "url": "https://gcgapi.com/",
+      "name": "gcg-api",
+      "description": "Free, open REST API and downloadable dataset for the Gundam Card Game (Gundam TCG).",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://gcgapi.com/#dataset",
+      "name": "gcg-api - Gundam Card Game (Gundam TCG) card dataset",
+      "description": "Every card in Bandai's Gundam Card Game as structured JSON: card numbers, set codes, rarity, colors, levels, costs, AP/HP, parsed keyword abilities and timing markers, plus links to the official per-card FAQ rulings and product metadata. Refreshed weekly from the official card database. Metadata only - card images are hotlinked to Bandai, never rehosted.",
+      "url": "https://gcgapi.com/",
+      "license": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "isAccessibleForFree": true,
+      "inLanguage": "en",
+      "isBasedOn": "https://www.gundam-gcg.com/en/cards",
+      "sameAs": "https://github.com/yzRobo/gcg-api",
+      "creator": { "@type": "Person", "name": "yzRobo", "url": "https://github.com/yzRobo" },
+      "keywords": ["Gundam TCG", "Gundam Card Game", "GCG", "trading card game", "card database", "card game API", "open data", "JSON", "NDJSON"],
+      "distribution": [
+        {
+          "@type": "DataDownload",
+          "name": "Full card dataset (NDJSON)",
+          "encodingFormat": "application/x-ndjson",
+          "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.ndjson"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "Full card dataset (JSON)",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://github.com/yzRobo/gcg-api/releases/download/data-latest/cards.json"
+        }
+      ]
+    },
+    {
+      "@type": "WebAPI",
+      "@id": "https://gcgapi.com/#api",
+      "name": "gcg-api REST API",
+      "description": "Read-only REST API for Gundam Card Game (Gundam TCG) cards, sets, products and official rulings. No key required; a free key raises the rate limit.",
+      "url": "https://api.gcgapi.com/",
+      "documentation": "https://api.gcgapi.com/docs",
+      "isAccessibleForFree": true,
+      "provider": { "@type": "Person", "name": "yzRobo", "url": "https://github.com/yzRobo" }
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -34,7 +89,7 @@
   <section class="hero">
     <div class="hero-copy">
       <h1>The Gundam Card Game, in JSON.</h1>
-      <p class="lede">gcg-api is a free, open dataset and REST API for Bandai's Gundam Card Game - scraped weekly from the official card database, served from the edge, no key required.</p>
+      <p class="lede">gcg-api is a free, open dataset and REST API for Bandai's Gundam Card Game - the Gundam TCG - scraped weekly from the official card database, served from the edge, no key required.</p>
       <div class="actions">
         <a class="btn primary" href="https://api.gcgapi.com/docs">Read the docs</a>
         <a class="btn outline" href="https://github.com/yzRobo/gcg-api">GitHub</a>
@@ -126,6 +181,24 @@
       </tbody>
     </table>
     <p class="note">The API is a convenience layer over the files. Pulling everything? Download the Release instead of paging.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow mono">questions</p>
+    <dl class="defs">
+      <dt>Is there a free Gundam TCG API?</dt>
+      <dd>This is one. No account, no email, no cost - keyless requests work immediately, and a free key only raises the rate limit.</dd>
+      <dt>Where can I download Gundam Card Game card data?</dt>
+      <dd>The whole dataset is a single NDJSON or JSON file on <a href="https://github.com/yzRobo/gcg-api/releases/tag/data-latest">GitHub Releases</a>. Bulk downloads are unmetered and never touch the API rate limits.</dd>
+      <dt>How current is the data?</dt>
+      <dd>A GitHub Action re-scrapes the official card database every Monday at 06:00 UTC and commits the result, so the repo history doubles as the changelog.</dd>
+      <dt>Does it include card images?</dt>
+      <dd>Metadata only. <code>image_url</code> points at Bandai's own servers - images are never copied or rehosted here.</dd>
+      <dt>Can I use it in a commercial project?</dt>
+      <dd>Yes. Code is MIT; the data compilation is ODbL - attribution required, and derivative databases you publish must share alike. Apps and sites built from the data stay yours.</dd>
+      <dt>Is this official?</dt>
+      <dd>No. It is an unofficial community project, not affiliated with or endorsed by Bandai.</dd>
+    </dl>
   </section>
 
   <section>
