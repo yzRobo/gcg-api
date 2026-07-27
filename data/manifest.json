@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "dataset_version": "8-2ee480b4303825e819f991558d53b6305eae4d46",
-  "built_at": "2026-07-20T09:02:55.076Z",
-  "card_count": 1709,
+  "dataset_version": "9-98e61e57e028c98f5da0a759057fc6c37e9ff640",
+  "built_at": "2026-07-27T09:57:04.760Z",
+  "card_count": 1777,
   "set_count": 21,
   "ruling_count": 308,
-  "product_count": 40,
+  "product_count": 41,
   "files": {
     "bulk_ndjson": "data/cards.ndjson",
     "bulk_json": "data/cards.json",
