@@ -20,8 +20,11 @@ const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '
 // Only these query params affect a response body; the cache key is built from them
 // (sorted) so junk params like ?_=<rand> cannot mint unlimited cache misses.
 // NOTE (cache-poisoning class): every param a route READS must be listed here, or two
-// different queries can collide on one cache entry. 'category' is the /v1/products filter.
-const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'category', 'limit', 'offset', 'include'];
+// different queries can collide on one cache entry. 'category' is the /v1/products and
+// /v1/rules-faq filter; 'q' is the /v1/rules-faq text search. Adding a route that reads a
+// new param WITHOUT adding it here silently serves one query's results for another - that
+// is exactly what happened when /v1/rules-faq shipped with 'q' missing from this list.
+const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'category', 'q', 'limit', 'offset', 'include'];
 
 // JSON-in-TEXT columns are stored as strings in D1; parse them back to arrays before returning,
 // since every card route does SELECT * and returns rows verbatim.
