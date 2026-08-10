@@ -43,12 +43,19 @@ const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsP
 // the SQL layer). When present, they are replaced wholesale like cards + rulings.
 const productsPath = path.join(__dirname,'..','data','products.json');
 const products = fs.existsSync(productsPath) ? JSON.parse(fs.readFileSync(productsPath,'utf8')) : [];
+// Rule-level FAQ is SUPPLEMENTARY too: same guard as products, an empty/missing file must
+// leave the existing rules_faq table alone rather than emit a bare DELETE/DROP.
+const rulesFaqPath = path.join(__dirname,'..','data','rules-faq.json');
+const rulesFaq = fs.existsSync(rulesFaqPath) ? JSON.parse(fs.readFileSync(rulesFaqPath,'utf8')) : [];
 const metaRows = [
   ['dataset_version', process.env.DATASET_VERSION || new Date().toISOString().slice(0,10)],
   ['card_count', String(cards.length)],
   ['ruling_count', String(rulings.length)],
   ['sets_summary', JSON.stringify(setsSummary)]
 ];
+// rules_faq_count backs /v1/manifest. Written only when entries exist, consistent with the
+// product_count guard below (the ruling_count lesson: a manifest claim must be backed by a row).
+if (rulesFaq.length > 0) metaRows.push(['rules_faq_count', String(rulesFaq.length)]);
 // product_count meta backs /v1/manifest (the ruling_count lesson: the manifest claim must be
 // backed by a meta row). Only written when products exist, to stay consistent with the guard
 // below that leaves the products table untouched on an empty file.
@@ -69,6 +76,21 @@ for (let i = 0; i < rulings.length; i += 100) {
   sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +
     chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
 }
+// Rule-level FAQ table (separate; supplementary, replaced wholesale each run). Guarded on
+// rulesFaq.length > 0 so an empty/missing rules-faq.json never wipes the table. DROP+CREATE
+// keeps the shape in sync with schema.sql without a hand-run ALTER.
+if (rulesFaq.length > 0) {
+  const fcols = ['num','category','date','date_iso','question','answer','source_url'];
+  sql += 'DROP TABLE IF EXISTS rules_faq;\n';
+  sql += `CREATE TABLE rules_faq (\n  num        TEXT,\n  category   TEXT,\n  date       TEXT,\n  date_iso   TEXT,\n  question   TEXT,\n  answer     TEXT,\n  source_url TEXT\n);\n`;
+  sql += 'CREATE INDEX IF NOT EXISTS idx_rules_faq_category ON rules_faq(category);\n';
+  for (let i = 0; i < rulesFaq.length; i += 100) {
+    const chunk = rulesFaq.slice(i, i + 100);
+    sql += `INSERT INTO rules_faq (${fcols.join(',')}) VALUES\n` +
+      chunk.map(r => `(${fcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
+  }
+}
+
 // Products table (separate; supplementary metadata, replaced wholesale each run). Guarded on
 // products.length > 0 so an empty/missing products.json never emits a bare DELETE that would
 // wipe the table (SQL-layer half of the zero-guard; msrp_value is the only numeric column).
@@ -85,4 +107,4 @@ if (products.length > 0) {
 // the import - like api_keys - so keys and their history persist across weekly refreshes).
 sql += "DELETE FROM usage_daily WHERE day < date('now','-35 day');\n";
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
-console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings, ${products.length} products)`);
+console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings, ${rulesFaq.length} rule FAQ, ${products.length} products)`);

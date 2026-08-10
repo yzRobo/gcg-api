@@ -80,6 +80,25 @@ CREATE TABLE IF NOT EXISTS rulings (
 );
 CREATE INDEX IF NOT EXISTS idx_rulings_card ON rulings(card_number);
 
+-- Rule-level official FAQ (added 2026-08-10). The "how does this MECHANIC work" corpus from
+-- the FAQ hub's category listings (Blocker, Breach, phases, Fundamental Terminology, ...), as
+-- opposed to the per-card rulings above. Shares ONE global question-number space with rulings
+-- and does not collide with it: a Q number is filed either against a card or under a rule
+-- category, never both (verified 2026-08-10 - the ranges interleave, Q1-Q195 vs Q113-Q426,
+-- but share zero numbers), so `num` is unique across both tables.
+-- SUPPLEMENTARY (like products): gen-sql only rewrites this table when entries exist, so a
+-- failed FAQ scrape never wipes it. gen-sql DROPs and recreates, so added columns need no ALTER.
+CREATE TABLE IF NOT EXISTS rules_faq (
+  num        TEXT,
+  category   TEXT,
+  date       TEXT,
+  date_iso   TEXT,
+  question   TEXT,
+  answer     TEXT,
+  source_url TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_rules_faq_category ON rules_faq(category);
+
 -- Per-key daily usage counters (M5+ /v1/me). Incremented fire-and-forget on KEYED requests
 -- only (anonymous traffic is never tracked: privacy + trivial D1 write volume). NEVER rewritten
 -- by the weekly import (same rule as api_keys); gen-sql only appends a 35-day prune.

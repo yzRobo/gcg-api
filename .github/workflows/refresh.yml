@@ -78,4 +78,5 @@ jobs:
             data/cards.json
             data/manifest.json
             data/rulings.json
+            data/rules-faq.json
             data/products.json

@@ -79,6 +79,47 @@ async function main() {
   // Rulings (num/date/question/answer + source_url back to the official page)
   fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
 
+  // Rule-level FAQ (SUPPLEMENTARY: same posture as products - a failure here must NEVER
+  // abort or degrade the card refresh. Cards + rulings are already written above).
+  // This is the "how does this mechanic work" corpus off the FAQ hub's category listings,
+  // as opposed to the per-card rulings written above. See src/faq-scraper.js.
+  const rulesFaqPath = path.join(OUT, 'rules-faq.json');
+  let rulesFaq = null;
+  try {
+    const { scrapeRulesFaq } = require('./faq-scraper');
+    rulesFaq = await scrapeRulesFaq();
+  } catch (err) {
+    console.error('Rule FAQ scrape FAILED (supplementary; continuing):', err && err.message);
+    rulesFaq = null;
+  }
+  {
+    let existing = 0;
+    try { if (fs.existsSync(rulesFaqPath)) existing = JSON.parse(fs.readFileSync(rulesFaqPath, 'utf8')).length; } catch (_) {}
+    if (rulesFaq && rulesFaq.length > 0) {
+      const withAnswer = rulesFaq.filter(f => f.answer && f.answer.length).length;
+      // Shrink-guard: a partial sweep (some categories 500'd, or the hub listed fewer)
+      // must not overwrite a much larger committed file. Same >25% rule as products.
+      if (existing > 0 && rulesFaq.length < existing * 0.75) {
+        console.warn(`WARNING: rule FAQ scrape yielded ${rulesFaq.length} but existing rules-faq.json has ${existing} rows (>25% drop) - KEEPING existing file (shrink-guard).`);
+      } else if (withAnswer < rulesFaq.length * 0.9) {
+        // Answer-coverage guard: mirrors the rulings gate. An empty-answer sweep is a
+        // selector break, and republishing it would look successful.
+        console.warn(`WARNING: only ${withAnswer}/${rulesFaq.length} rule FAQ entries have answer text (<90%) - KEEPING existing file (.faqResult_answer likely broke).`);
+      } else {
+        fs.writeFileSync(rulesFaqPath, JSON.stringify(rulesFaq, null, 0));
+        console.log(`Wrote rules-faq.json (${rulesFaq.length} entries, ${withAnswer} with answers)`);
+      }
+    } else if (existing > 0) {
+      // Zero-guard (mandatory): a 0-entry scrape must NOT wipe an existing dataset.
+      console.warn(`WARNING: rule FAQ scrape yielded 0 but existing rules-faq.json has ${existing} rows - KEEPING existing file (zero-guard).`);
+    } else {
+      console.warn('WARNING: rule FAQ scrape yielded 0 and no existing rules-faq.json - writing empty array.');
+      fs.writeFileSync(rulesFaqPath, JSON.stringify([], null, 0));
+    }
+  }
+  let rulesFaqCount = 0;
+  try { if (fs.existsSync(rulesFaqPath)) rulesFaqCount = JSON.parse(fs.readFileSync(rulesFaqPath, 'utf8')).length; } catch (_) {}
+
   // Products (SUPPLEMENTARY: a failure here must NEVER abort or degrade the card refresh).
   // Cards + rulings are already written above, so anything below is safe to fail.
   const productsPath = path.join(OUT, 'products.json');
@@ -123,8 +164,9 @@ async function main() {
     card_count: cards.length,
     set_count: setIndex.length,
     ruling_count: rulings.length,
+    rules_faq_count: rulesFaqCount,
     product_count: productCount,
-    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json', products: 'data/products.json' },
+    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json', rules_faq: 'data/rules-faq.json', products: 'data/products.json' },
     disclaimer: 'Not affiliated with Bandai. Gundam and card images are copyright Bandai.'
   }, null, 2));
 

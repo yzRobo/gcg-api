@@ -27,7 +27,7 @@ curl -L "https://api.gcgapi.com/v1/bulk" -o cards.ndjson
 
 The files also live in this repo under [`data/`](data/): `cards.ndjson`, `cards.json`,
 per-set files in `cards/en/*.json`, a set index in `sets/en/index.json`, `rulings.json`,
-`products.json`, and `manifest.json`.
+`rules-faq.json`, `products.json`, and `manifest.json`.
 
 **2. Query the API** (a convenience layer over the files):
 
@@ -72,7 +72,9 @@ returns `429` with a `Retry-After` header. For bulk data, download the file inst
 | `GET /v1/sets` | All sets with card counts |
 | `GET /v1/sets/{code}/cards` | All cards in a set, e.g. `GD01` |
 | `GET /v1/sets/{code}/products` | All products for a set code, e.g. `GD06` |
-| `GET /v1/manifest` | Dataset version, card/ruling/product counts, bulk URL |
+| `GET /v1/rules-faq` | Rule-level official FAQ (how a mechanic works, not what one card does) with questions and answers. `?category=`, `?q=` |
+| `GET /v1/rules-faq/categories` | Distinct rule-FAQ categories with entry counts |
+| `GET /v1/manifest` | Dataset version, card/ruling/rule-FAQ/product counts, bulk URL |
 | `GET /v1/bulk` | 302 redirect to the full NDJSON dataset |
 | `GET /register` | Self-serve free API key page |
 | `GET /v1/me` | Your key status, tier, limit, and usage (today / 7d / 30d) - send `X-API-Key` (or `Authorization: Bearer`); never cached |

@@ -402,7 +402,38 @@ async function route(url, env, version) {
   if (p === '/openapi.json') return json(openapiSpec(url));
 
   if (p === '/v1/manifest') {
-    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), product_count: await productCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), rules_faq_count: await rulesFaqCount(env), product_count: await productCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+  }
+
+  // Rule-level official FAQ: the "how does this mechanic work" corpus, as opposed to the
+  // per-card rulings on /v1/cards/{id}?include=rulings. Small (about 117 entries), so it is
+  // returned in full by default; ?category= filters, ?q= does a substring match on Q+A.
+  if (p === '/v1/rules-faq') {
+    const category = (url.searchParams.get('category') || '').trim();
+    const q = (url.searchParams.get('q') || '').trim();
+    const where = [];
+    const binds = [];
+    if (category) { binds.push(category); where.push(`category = ?${binds.length}`); }
+    if (q) { binds.push(`%${q}%`, `%${q}%`); where.push(`(question LIKE ?${binds.length - 1} OR answer LIKE ?${binds.length})`); }
+    const sql = `SELECT num, category, date, date_iso, question, answer, source_url FROM rules_faq${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY CAST(REPLACE(num,'Q','') AS INTEGER)`;
+    try {
+      const { results } = await env.DB.prepare(sql).bind(...binds).all();
+      return json({ _meta: { disclaimer: DISCLAIMER, total: results.length }, data: results });
+    } catch (_) {
+      // Table absent (import has not run since the FAQ table was added) - report empty
+      // rather than 500, same tolerance as the count helper.
+      return json({ _meta: { disclaimer: DISCLAIMER, total: 0 }, data: [] });
+    }
+  }
+
+  // Distinct rule-FAQ categories, for building a filter UI without pulling every entry.
+  if (p === '/v1/rules-faq/categories') {
+    try {
+      const { results } = await env.DB.prepare(`SELECT category, COUNT(*) AS count FROM rules_faq GROUP BY category ORDER BY category`).all();
+      return json({ _meta: { disclaimer: DISCLAIMER, total: results.length }, data: results });
+    } catch (_) {
+      return json({ _meta: { disclaimer: DISCLAIMER, total: 0 }, data: [] });
+    }
   }
 
   // Redirect bulk downloads to the rolling Release asset - no Worker compute.
@@ -514,7 +545,7 @@ async function route(url, env, version) {
     return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results });
   }
 
-  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/products', '/v1/products/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/sets/:code/products', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
+  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/products', '/v1/products/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/sets/:code/products', '/v1/rules-faq', '/v1/rules-faq/categories', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
 }
 
 // ---- OpenAPI 3 spec (served at /openapi.json). Kept in sync with route() by hand. ----
@@ -653,8 +684,22 @@ function openapiSpec(url) {
           responses: { '200': { description: 'Products for the set' } }
         }
       },
+      '/v1/rules-faq': {
+        get: {
+          tags: ['rules-faq'],
+          summary: 'Rule-level official FAQ (mechanics, keywords, phases) with questions and answers',
+          parameters: [
+            { name: 'category', in: 'query', required: false, schema: { type: 'string' }, description: 'Exact rule category, e.g. "Blocker" or "Main Phase: Playing Cards". See /v1/rules-faq/categories.' },
+            { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Substring match across question and answer text.' }
+          ],
+          responses: { '200': { description: 'Rule FAQ entries' } }
+        }
+      },
+      '/v1/rules-faq/categories': {
+        get: { tags: ['rules-faq'], summary: 'Distinct rule-FAQ categories with entry counts', responses: { '200': { description: 'Categories' } } }
+      },
       '/v1/manifest': {
-        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
+        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, rule-FAQ count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
       '/v1/me': {
         get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key (or Authorization: Bearer); response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
@@ -697,6 +742,7 @@ function docsPage(url) {
     ['schema', 'Card schema'],
     ['products', 'Products'],
     ['rulings', 'Rulings'],
+    ['rules-faq', 'Rule FAQ'],
     ['bulk', 'Bulk download'],
     ['caching', 'Caching &amp; CORS'],
     ['license', 'License &amp; attribution']
@@ -790,7 +836,9 @@ function docsPage(url) {
     <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/cards</code></td><td>All cards in a set, e.g. <code>GD01</code>. Unpaginated; <code>_meta.count</code> has the size.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/products</code></td><td>All products for a set code, e.g. <code>GD06</code>. Unpaginated.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, product count, bulk URL.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/rules-faq</code></td><td>Rule-level official FAQ (mechanics, keywords, phases) with answers. <code>?category=</code>, <code>?q=</code>.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/rules-faq/categories</code></td><td>Distinct rule-FAQ categories with entry counts.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, rule-FAQ count, product count, bulk URL.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/me</code></td><td>Your key status, tier, limit, and usage today/7d/30d (send <code>X-API-Key</code>; never cached).</td></tr>
     <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
@@ -928,6 +976,27 @@ curl "${base}/v1/sets/GD06/products"</pre>
   <p class="muted">Cards without rulings return an empty array. Rulings attach only on <code>/v1/cards/{id}</code>; the ruling total is in <code>/v1/manifest</code>.</p>
   </section>
 
+  <section id="rules-faq">
+  <h2>Rule FAQ <a class="anchor" href="#rules-faq" aria-label="Link to this section">#</a></h2>
+  <p>The official FAQ's <b>rule-level</b> entries: how a mechanic works in general, rather than what one card does. Categories cover keywords (<code>Blocker</code>, <code>Breach</code>, <code>First Strike</code>, <code>Repair</code>, <code>Suppression</code>, ...), the phases, and <code>Fundamental Terminology</code>. If you are building a rules engine, this is the corpus you want alongside the Comprehensive Rules.</p>
+  <p>Rule FAQ and per-card rulings share <b>one global question-number space and do not collide</b>: a question is filed either against a card or under a rule category, never both. The ranges interleave but no number appears in both, so <code>num</code> is unique across the two and safe to join on.</p>
+  <pre>curl "${base}/v1/rules-faq?category=Blocker"
+
+"data": [
+  {
+    "num": "Q59",
+    "category": "Blocker",
+    "date": "July 04, 2025",
+    "date_iso": "2025-07-04",
+    "question": "Can &lt;Blocker&gt; on a rested Unit be activated?",
+    "answer": "No, it cannot.",
+    "source_url": "https://www.gundam-gcg.com/en/rules/faqs/list.php?sub_category=Blocker"
+  }
+]</pre>
+  <p><code>?q=</code> substring-matches question and answer text. <code>/v1/rules-faq/categories</code> lists every category with its entry count. The whole corpus is small, so an unfiltered <code>/v1/rules-faq</code> returns all of it.</p>
+  <p class="muted">Bandai's FAQ pages remain the authority - every entry carries the <code>source_url</code> it came from.</p>
+  </section>
+
   <section id="bulk">
   <h2>Bulk download <a class="anchor" href="#bulk" aria-label="Link to this section">#</a></h2>
   <p>The full dataset is a single newline-delimited JSON file, always current, on the GitHub Release:</p>
@@ -993,6 +1062,20 @@ async function cardCount(env) {
   if (!Number.isNaN(n)) return n;
   const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM cards`).first();
   return c ? c.n : 0;
+}
+
+// Static rule-FAQ count from meta (written by the weekly import); falls back to COUNT(*).
+// Like product_count, gen-sql only writes this meta row when entries exist, so a FAQ-less
+// deployment falls through to COUNT(*). The table may not exist at all on an older DB, so
+// the fallback is wrapped - a missing table must not 500 the manifest.
+async function rulesFaqCount(env) {
+  const row = await env.DB.prepare(`SELECT value FROM meta WHERE key = 'rules_faq_count'`).first();
+  const n = row ? parseInt(row.value, 10) : NaN;
+  if (!Number.isNaN(n)) return n;
+  try {
+    const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM rules_faq`).first();
+    return c ? c.n : 0;
+  } catch (_) { return 0; }
 }
 
 // Static ruling count from meta (written by the weekly import); falls back to COUNT(*).
