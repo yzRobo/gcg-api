@@ -1,16 +1,18 @@
 {
   "schema_version": 1,
-  "dataset_version": "12-f9239c2650b9954f5cc279cc0ed5d0215765b9d0",
-  "built_at": "2026-08-10T21:41:26.245Z",
+  "dataset_version": "13-559c60da5fc08945aa0b5bffc1223694b3334dc6",
+  "built_at": "2026-08-10T22:04:40.599Z",
   "card_count": 1816,
   "set_count": 21,
   "ruling_count": 308,
+  "rules_faq_count": 117,
   "product_count": 45,
   "files": {
     "bulk_ndjson": "data/cards.ndjson",
     "bulk_json": "data/cards.json",
     "sets": "data/sets/en/index.json",
     "rulings": "data/rulings.json",
+    "rules_faq": "data/rules-faq.json",
     "products": "data/products.json"
   },
   "disclaimer": "Not affiliated with Bandai. Gundam and card images are copyright Bandai."
