@@ -56,9 +56,14 @@ if (products.length > 0) metaRows.push(['product_count', String(products.length)
 for (const [k, v] of metaRows) {
   sql += `INSERT INTO meta (key,value) VALUES ('${k}',${esc(v)}) ON CONFLICT(key) DO UPDATE SET value=excluded.value;\n`;
 }
-// Rulings table (separate; link-only rulings, replaced wholesale each run). rulings loaded above.
-const rcols = ['card_number','num','date','question','source_url'];
-sql += 'DELETE FROM rulings;\n';
+// Rulings table (separate; replaced wholesale each run). rulings loaded above.
+// DROP + CREATE rather than DELETE: rulings are replaced in full every run anyway, so
+// recreating the table makes an added column (e.g. `answer`, 2026-08-10) reach an existing
+// remote D1 without a hand-run ALTER. Keep this CREATE in sync with schema.sql.
+const rcols = ['card_number','num','date','question','answer','source_url'];
+sql += 'DROP TABLE IF EXISTS rulings;\n';
+sql += `CREATE TABLE rulings (\n  card_number TEXT,\n  num         TEXT,\n  date        TEXT,\n  question    TEXT,\n  answer      TEXT,\n  source_url  TEXT\n);\n`;
+sql += 'CREATE INDEX IF NOT EXISTS idx_rulings_card ON rulings(card_number);\n';
 for (let i = 0; i < rulings.length; i += 100) {
   const chunk = rulings.slice(i, i + 100);
   sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +

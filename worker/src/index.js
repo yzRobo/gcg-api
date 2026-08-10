@@ -448,8 +448,8 @@ async function route(url, env, version) {
     if (!row) return json({ error: 'Not found' }, 404);
     const card = hydrate(row);
     if ((url.searchParams.get('include') || '').split(',').map((s) => s.trim()).includes('rulings')) {
-      // Link-only official rulings for this card_number (num/date/question + source_url; no answer prose).
-      const { results } = await env.DB.prepare(`SELECT num, date, question, source_url FROM rulings WHERE card_number = ?1 ORDER BY num`).bind(card.card_number).all();
+      // Official rulings for this card_number (num/date/question/answer + source_url).
+      const { results } = await env.DB.prepare(`SELECT num, date, question, answer, source_url FROM rulings WHERE card_number = ?1 ORDER BY num`).bind(card.card_number).all();
       card.rulings = results;
     }
     return json({ _meta: { disclaimer: DISCLAIMER }, data: card });
@@ -618,7 +618,7 @@ function openapiSpec(url) {
           tags: ['cards'], summary: 'Get one card by product_id or card_number',
           parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'product_id (e.g. GD01-001_p1) or card_number (e.g. GD01-001; returns the base printing).' },
-            { name: 'include', in: 'query', required: false, schema: { type: 'string', enum: ['rulings'] }, description: 'Comma-separated extras. "rulings" attaches the card\'s official FAQ rulings (link-only: number, date, question + source_url; the answer prose is not reproduced).' }
+            { name: 'include', in: 'query', required: false, schema: { type: 'string', enum: ['rulings'] }, description: 'Comma-separated extras. "rulings" attaches the card\'s official FAQ rulings (number, date, question, answer + source_url).' }
           ],
           responses: { '200': { description: 'The card' }, '404': { description: 'Not found' } }
         }
@@ -784,7 +784,7 @@ function docsPage(url) {
   <table>
     <tr><th>Method / Path</th><th>Description</th></tr>
     <tr><td><span class="pill">GET</span><code>/v1/cards</code></td><td>List/filter cards. Query params below.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing). Add <code>?include=rulings</code> for official FAQ rulings (link-only).</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/cards/{id}</code></td><td>One card by <code>product_id</code> or <code>card_number</code> (a card_number returns the base printing). Add <code>?include=rulings</code> for official FAQ rulings (question + answer).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/products</code></td><td>List/filter products (boosters, starter decks, accessories, promos). Query params below.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/products/{id}</code></td><td>One product by <code>product_id</code> slug, e.g. <code>st10</code>.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/sets</code></td><td>All sets with card counts.</td></tr>
@@ -878,7 +878,7 @@ curl "${base}/v1/me" -H "X-API-Key: gcd_your_key_here"</pre>
 
   <section id="products">
   <h2>Products <a class="anchor" href="#products" aria-label="Link to this section">#</a></h2>
-  <p>Official product metadata: booster packs, starter decks, accessories, and promo products, scraped from the official products list. Metadata only - <b>images are hotlinked, never rehosted</b>, and marketing prose is excluded (same posture as ruling answers). <code>/v1/products</code> lists newest first (undated products sort last).</p>
+  <p>Official product metadata: booster packs, starter decks, accessories, and promo products, scraped from the official products list. Metadata only - <b>images are hotlinked, never rehosted</b>, and marketing prose is excluded. <code>/v1/products</code> lists newest first (undated products sort last).</p>
   <h3>Query parameters <a class="anchor" href="#products" aria-label="Link to this section">#</a></h3>
   <table>
     <tr><th>Param</th><th>Type</th><th>Match</th></tr>
@@ -913,7 +913,7 @@ curl "${base}/v1/sets/GD06/products"</pre>
 
   <section id="rulings">
   <h2>Rulings <a class="anchor" href="#rulings" aria-label="Link to this section">#</a></h2>
-  <p>Official per-card FAQ rulings from the source site, captured <b>link-only</b>: the ruling number, date, and question, plus a <code>source_url</code> back to the official card page. Answer text is not reproduced - follow <code>source_url</code> to read Bandai's answer.</p>
+  <p>Official per-card FAQ rulings from the source site: the ruling number, date, question, and answer, plus a <code>source_url</code> back to the official card page. Bandai's page remains the authority - <code>source_url</code> is there so you can always cite and re-check the original.</p>
   <pre>curl "${base}/v1/cards/GD01-001?include=rulings"
 
 "rulings": [
@@ -921,6 +921,7 @@ curl "${base}/v1/sets/GD06/products"</pre>
     "num": "Q119",
     "date": "July 11, 2025",
     "question": "Does this Unit also gain &lt;Repair: 1&gt; from the first effect?",
+    "answer": "Yes, it does.",
     "source_url": "https://www.gundam-gcg.com/en/cards/detail.php?detailSearch=GD01-001"
   }
 ]</pre>

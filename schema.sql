@@ -63,14 +63,19 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_ip ON api_keys(created_ip_hash);
 
--- Official per-card FAQ rulings (M5). LINK-ONLY posture: number, date, and question text,
--- plus source_url back to the official page - the answer prose (Bandai copyright) is NOT stored.
+-- Official per-card FAQ rulings (M5). Stores number, date, question AND the official answer
+-- prose, plus source_url back to the official page as the citable authority. The earlier
+-- link-only posture (answers omitted) was reversed by owner decision on 2026-08-10 because
+-- rules-engine consumers need the answer to resolve an ambiguity.
 -- Replaced wholesale by each import (like cards); exposed via /v1/cards/:id?include=rulings.
+-- NOTE: gen-sql.js DROPs and recreates this table on every import, so a column added here
+-- reaches an existing remote D1 without a hand-run ALTER.
 CREATE TABLE IF NOT EXISTS rulings (
   card_number TEXT,
   num         TEXT,
   date        TEXT,
   question    TEXT,
+  answer      TEXT,
   source_url  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_rulings_card ON rulings(card_number);

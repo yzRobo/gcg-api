@@ -29,9 +29,9 @@ async function main() {
     let count = 0;
     for (const rc of raw) {
       if (rc.product_id && !byId.has(rc.product_id)) { byId.set(rc.product_id, normalizeCard(rc, pkg)); count++; }
-      for (const r of (rc.rulings || [])) {                       // link-only rulings, deduped per card_number
+      for (const r of (rc.rulings || [])) {                       // rulings deduped per card_number (alt-art printings share a FAQ)
         const key = `${rc.card_number}|${r.num}`;
-        if (!rulingsByKey.has(key)) rulingsByKey.set(key, { card_number: rc.card_number, num: r.num, date: r.date, question: r.question, source_url: rc.detail_url });
+        if (!rulingsByKey.has(key)) rulingsByKey.set(key, { card_number: rc.card_number, num: r.num, date: r.date, question: r.question, answer: r.answer || '', source_url: rc.detail_url });
       }
     }
     setIndex.push({ set_code: pkg.code || null, set_name: pkg.name.replace(/\s*\[[^\]]*\]\s*$/, '').trim(), card_count: count });
@@ -52,6 +52,14 @@ async function main() {
   if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) - effect parsing likely broke`);
   const badTypeSep = cards.filter(c => /[・･]/.test(c.card_type)).length;
   if (badTypeSep > 0) throw new Error(`SANITY: ${badTypeSep} cards still have a fullwidth-dot card_type separator - normalizeType broke`);
+  // Answer prose must actually be landing. Without this, a .qaColAnswer selector break would
+  // silently republish every ruling with an empty answer and the run would still go green.
+  if (rulings.length > 0) {
+    const rulingsWithAnswer = rulings.filter(r => r.answer && r.answer.length).length;
+    if (rulingsWithAnswer < rulings.length * 0.9) {
+      throw new Error(`SANITY: only ${rulingsWithAnswer}/${rulings.length} rulings have answer text (<90%) - .qaColAnswer selector likely broke`);
+    }
+  }
   console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets, ${rulings.length} rulings`);
 
   // ---- Write artifacts ----
@@ -68,7 +76,7 @@ async function main() {
   for (const [k, list] of Object.entries(bySet)) fs.writeFileSync(path.join(OUT, 'cards', 'en', `${k}.json`), JSON.stringify(list, null, 0));
   // Sets index
   fs.writeFileSync(path.join(OUT, 'sets', 'en', 'index.json'), JSON.stringify(setIndex, null, 2));
-  // Rulings (link-only: num/date/question + source_url; NOT the answer text)
+  // Rulings (num/date/question/answer + source_url back to the official page)
   fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
 
   // Products (SUPPLEMENTARY: a failure here must NEVER abort or degrade the card refresh).

@@ -104,15 +104,23 @@ class GundamScraper {
       if (label) fields[label] = value;
     });
 
-    // FAQ / rulings block on the same page. Link-only per project posture: capture the
-    // number, date, and question (short, identifying), but NOT the answer prose (Bandai
-    // copyright) - consumers follow detail_url to the official answer.
+    // FAQ / rulings block on the same page. Captures the number, date, question AND the
+    // official answer prose. This reverses the earlier link-only posture (owner decision,
+    // 2026-08-10): rules-engine consumers need the answer to resolve an ambiguity, and a
+    // source_url alone forces every consumer to re-scrape the same page. source_url is still
+    // emitted so the official page remains the citable authority.
     const rulings = [];
     $('.cardQaCol .qaCol').each((i, el) => {
       const num = $(el).find('.qaColNum').text().replace(/\s+/g, ' ').trim();
       const date = $(el).find('.qaColDate').text().replace(/\s+/g, ' ').replace(/\s*Updated\s*$/i, '').trim();
       const question = $(el).find('.qaColQuestion').text().replace(/\s+/g, ' ').trim();
-      if (num || question) rulings.push({ num, date, question });
+      // Answers are one or more <p> under .qaColAnswer; keep paragraph breaks, collapse the
+      // whitespace inside each paragraph (same treatment `effect` gets).
+      const $answer = $(el).find('.qaColAnswer');
+      let answer = $answer.find('p').map((j, p) => $(p).text().replace(/\s+/g, ' ').trim()).get().filter(Boolean).join('\n');
+      // Fall back to the container text when the markup has no <p> wrapper.
+      if (!answer) answer = $answer.text().replace(/\s+/g, ' ').trim();
+      if (num || question) rulings.push({ num, date, question, answer });
     });
 
     return {

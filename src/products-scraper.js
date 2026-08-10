@@ -8,7 +8,7 @@
 //          + .cardTit + .cardThumb img[src] + .cardInfo dt/dd (Release Date, MSRP)
 //   pager total pages from .pagerColInner text "1/4".
 // Detail: from each product_url; dt/dd labels Release Date / MSRP / Contents (skip the rest -
-//   marketing prose stays out of the dataset, same posture as ruling answers).
+//   marketing prose stays out of the dataset).
 const axios = require('axios');
 const cheerio = require('cheerio');
 
