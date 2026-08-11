@@ -53,14 +53,25 @@ function linkRefs(str) {
   return out;
 }
 
+// The source mixes ASCII and FULL-WIDTH digits in stat cells (U+FF10-U+FF19). ST06-008
+// prints its AP and HP as '３', GD04-028 its HP as '１'. parseInt returns NaN for those,
+// which silently produced UNITs with null AP/HP - unusable to a rules engine and invisible
+// in the output, since a null stat looks like a legitimately blank one. Fold them to ASCII
+// before parsing, and in the _raw strings too so those stay machine-readable.
+function toAsciiDigits(v) {
+  return typeof v === 'string'
+    ? v.replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xFEE0))
+    : v;
+}
+
 // Raw stat string: keep "+1"/"+2" pilot modifiers verbatim (toInt drops the sign); null for "-"/blank.
-function rawStat(v) { return v && v.trim() && v.trim() !== '-' ? v.trim() : null; }
+function rawStat(v) { const s = toAsciiDigits(v); return s && s.trim() && s.trim() !== '-' ? s.trim() : null; }
 
 // Normalize the card_type separator: the source has both "UNIT TOKEN" and "UNIT・TOKEN".
 function normalizeType(v) { return (v || '').replace(/[・･]/g, ' ').replace(/\s+/g, ' ').trim(); }
 
 function normalizeCard(raw, pkg) {
-  const toInt = (v) => { const n = parseInt(v, 10); return Number.isNaN(n) ? null : n; };
+  const toInt = (v) => { const n = parseInt(toAsciiDigits(v), 10); return Number.isNaN(n) ? null : n; };
   const fields = raw.fields || {};
   const keys = Object.keys(fields);
   const field = (label) => {
@@ -117,4 +128,4 @@ function normalizeCard(raw, pkg) {
   };
 }
 
-module.exports = { normalizeCard, extractKeywordEffects, extractTimingMarkers, parenGroups, linkRefs };
+module.exports = { normalizeCard, extractKeywordEffects, extractTimingMarkers, parenGroups, linkRefs, toAsciiDigits };

@@ -58,6 +58,17 @@ async function main() {
   // Card-type-aware: UNITs must have AP/HP; only assert on the fields a type actually has.
   const unitsMissingStats = cards.filter(c => /UNIT/i.test(c.card_type) && !/TOKEN/i.test(c.card_type) && (c.ap == null || c.hp == null)).length;
   if (unitsMissingStats > cards.length * 0.05) throw new Error(`SANITY: ${unitsMissingStats} UNITs missing AP/HP - stat labels likely changed`);
+  // A stat cell that HAS a value but does not parse is always a bug, so this is zero-tolerance
+  // rather than percentage-based. It is deliberately narrower than the UNIT check below:
+  // a legitimately blank stat leaves BOTH the raw string and the parsed value null and does not
+  // trip this, while a full-width digit (ST06-008 printed its AP as '３') leaves a non-empty raw
+  // and a null parse. That combination went undetected because 3 printings is far under the 5%
+  // threshold the UNIT gate uses.
+  const statParseFailures = cards.filter((c) => (c.ap_raw != null && c.ap == null) || (c.hp_raw != null && c.hp == null));
+  if (statParseFailures.length > 0) {
+    const s = statParseFailures.slice(0, 5).map((c) => `${c.product_id} ap_raw=${JSON.stringify(c.ap_raw)}->${c.ap} hp_raw=${JSON.stringify(c.hp_raw)}->${c.hp}`).join('; ');
+    throw new Error(`SANITY: ${statParseFailures.length} printing(s) have a non-empty stat string that parsed to null - unhandled numeral form or a stat-cell format change. ${s}`);
+  }
   // M5: structured keyword/timing extraction must be producing data (guards a silent effect-selector break).
   const cardsWithKeywords = cards.filter(c => (c.keyword_effects && c.keyword_effects.length) || (c.timing_markers && c.timing_markers.length)).length;
   if (cardsWithKeywords < cards.length * 0.3) throw new Error(`SANITY: only ${cardsWithKeywords} cards have keyword/timing data (<30%) - effect parsing likely broke`);
