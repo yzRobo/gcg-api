@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
-  "dataset_version": "18-80c9cfa09f33e10db69132b445c549ba473db878",
-  "built_at": "2026-08-11T03:39:00.429Z",
+  "dataset_version": "19-65e41fe96caf58e4ae0a8e87f696ba15ff50cfd3",
+  "source_commit": "65e41fe96caf58e4ae0a8e87f696ba15ff50cfd3",
+  "built_at": "2026-08-11T04:09:25.991Z",
   "card_count": 1816,
-  "set_count": 21,
+  "set_count": 24,
   "ruling_count": 308,
   "rules_faq_count": 117,
   "errata_count": 2,
