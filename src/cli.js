@@ -4,6 +4,7 @@ const path = require('path');
 const GundamScraper = require('./scraper');
 const { normalizeCard } = require('./normalize');
 const { assertScrapingAllowed } = require('./robots'); // rider 3: robots.txt precheck
+const { applyErrataToRaw, finalizeErrata } = require('./errata'); // official card corrections
 
 const OUT = path.join(__dirname, '..', 'data');
 const VERSION = process.env.DATASET_VERSION || new Date().toISOString().slice(0, 10); // set in CI
@@ -20,6 +21,7 @@ async function main() {
 
   const byId = new Map();
   const rulingsByKey = new Map();
+  const errataTally = new Map();   // errata entry -> { applied, upstream_fixed, miss, samples }
   const setIndex = [];
   for (const pkg of packages) {
     const raw = await scraper.scrapePackage(pkg, {
@@ -28,6 +30,15 @@ async function main() {
     process.stdout.write('\n');
     let count = 0;
     for (const rc of raw) {
+      // Apply official errata to the RAW record BEFORE normalizeCard. Normalize derives
+      // traits[] from trait and keyword_effects/timing_markers/keywords_text from effect,
+      // so patching after normalization would leave those derived fields stale.
+      for (const o of applyErrataToRaw(rc)) {
+        const t = errataTally.get(o.entry) || { applied: 0, upstream_fixed: 0, miss: 0, samples: [] };
+        t[o.outcome]++;
+        if (o.outcome === 'miss') t.samples.push(o.current);
+        errataTally.set(o.entry, t);
+      }
       if (rc.product_id && !byId.has(rc.product_id)) { byId.set(rc.product_id, normalizeCard(rc, pkg)); count++; }
       for (const r of (rc.rulings || [])) {                       // rulings deduped per card_number (alt-art printings share a FAQ)
         const key = `${rc.card_number}|${r.num}`;
@@ -60,7 +71,12 @@ async function main() {
       throw new Error(`SANITY: only ${rulingsWithAnswer}/${rulings.length} rulings have answer text (<90%) - .qaColAnswer selector likely broke`);
     }
   }
-  console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets, ${rulings.length} rulings`);
+  // Errata gate. Deliberately CRITICAL, not supplementary: applying a correction to text
+  // that has changed underneath us silently corrupts card data, which is the one thing
+  // errata handling exists to prevent. Throws on a miss, on an unknown card, or on
+  // printings of one card disagreeing about whether the fix is needed.
+  const errata = finalizeErrata(errataTally);
+  console.log(`Sanity OK: ${cards.length} cards across ${setIndex.length} sets, ${rulings.length} rulings, ${errata.length} errata`);
 
   // ---- Write artifacts ----
   fs.mkdirSync(path.join(OUT, 'cards', 'en'), { recursive: true });
@@ -78,6 +94,9 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'sets', 'en', 'index.json'), JSON.stringify(setIndex, null, 2));
   // Rulings (num/date/question/answer + source_url back to the official page)
   fs.writeFileSync(path.join(OUT, 'rulings.json'), JSON.stringify(rulings, null, 0));
+  // Errata ledger. The corrections are ALREADY baked into the card records above; this
+  // file is the audit trail showing what was changed, from what, and on whose authority.
+  fs.writeFileSync(path.join(OUT, 'errata.json'), JSON.stringify(errata, null, 1));
 
   // Rule-level FAQ (SUPPLEMENTARY: same posture as products - a failure here must NEVER
   // abort or degrade the card refresh. Cards + rulings are already written above).
@@ -165,8 +184,9 @@ async function main() {
     set_count: setIndex.length,
     ruling_count: rulings.length,
     rules_faq_count: rulesFaqCount,
+    errata_count: errata.length,
     product_count: productCount,
-    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json', rules_faq: 'data/rules-faq.json', products: 'data/products.json' },
+    files: { bulk_ndjson: 'data/cards.ndjson', bulk_json: 'data/cards.json', sets: 'data/sets/en/index.json', rulings: 'data/rulings.json', rules_faq: 'data/rules-faq.json', errata: 'data/errata.json', products: 'data/products.json' },
     disclaimer: 'Not affiliated with Bandai. Gundam and card images are copyright Bandai.'
   }, null, 2));
 

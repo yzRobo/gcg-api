@@ -79,4 +79,5 @@ jobs:
             data/manifest.json
             data/rulings.json
             data/rules-faq.json
+            data/errata.json
             data/products.json

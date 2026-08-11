@@ -21,10 +21,11 @@ const TEST_SITEKEYS = ['1x00000000000000000000AA', '2x00000000000000000000AB', '
 // (sorted) so junk params like ?_=<rand> cannot mint unlimited cache misses.
 // NOTE (cache-poisoning class): every param a route READS must be listed here, or two
 // different queries can collide on one cache entry. 'category' is the /v1/products and
-// /v1/rules-faq filter; 'q' is the /v1/rules-faq text search. Adding a route that reads a
-// new param WITHOUT adding it here silently serves one query's results for another - that
-// is exactly what happened when /v1/rules-faq shipped with 'q' missing from this list.
-const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'category', 'q', 'limit', 'offset', 'include'];
+// /v1/rules-faq filter; 'q' is the /v1/rules-faq text search; 'card_number' is the
+// /v1/errata filter. Adding a route that reads a new param WITHOUT adding it here silently
+// serves one query's results for another - that is exactly what happened when
+// /v1/rules-faq shipped with 'q' missing from this list.
+const CACHE_PARAMS = ['set_code', 'card_type', 'color', 'rarity', 'level', 'cost', 'ap', 'hp', 'name', 'effect', 'keyword', 'category', 'q', 'card_number', 'limit', 'offset', 'include'];
 
 // JSON-in-TEXT columns are stored as strings in D1; parse them back to arrays before returning,
 // since every card route does SELECT * and returns rows verbatim.
@@ -405,7 +406,22 @@ async function route(url, env, version) {
   if (p === '/openapi.json') return json(openapiSpec(url));
 
   if (p === '/v1/manifest') {
-    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), rules_faq_count: await rulesFaqCount(env), product_count: await productCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+    return json({ dataset_version: version, card_count: await cardCount(env), ruling_count: await rulingCount(env), rules_faq_count: await rulesFaqCount(env), errata_count: await errataCount(env), product_count: await productCount(env), bulk_url: `${url.origin}/v1/bulk`, disclaimer: DISCLAIMER });
+  }
+
+  // Official card errata. The corrections are ALREADY APPLIED to the card records this API
+  // serves, so /v1/cards returns post-errata text; this endpoint is the audit trail showing
+  // what changed and on whose authority. Tiny corpus, returned in full; ?card_number= filters.
+  if (p === '/v1/errata') {
+    const cardNumber = (url.searchParams.get('card_number') || '').trim();
+    const sql = `SELECT card_number, name, field, before_text AS before, after_text AS after, date, source_url, note, status, printings_affected FROM errata${cardNumber ? ' WHERE card_number = ?1' : ''} ORDER BY date, card_number`;
+    try {
+      const stmt = cardNumber ? env.DB.prepare(sql).bind(cardNumber) : env.DB.prepare(sql);
+      const { results } = await stmt.all();
+      return json({ _meta: { disclaimer: DISCLAIMER, total: results.length, applied_to_cards: true }, data: results });
+    } catch (_) {
+      return json({ _meta: { disclaimer: DISCLAIMER, total: 0, applied_to_cards: true }, data: [] });
+    }
   }
 
   // Rule-level official FAQ: the "how does this mechanic work" corpus, as opposed to the
@@ -548,7 +564,7 @@ async function route(url, env, version) {
     return json({ _meta: { disclaimer: DISCLAIMER, total, limit, offset, count: results.length }, data: results });
   }
 
-  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/products', '/v1/products/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/sets/:code/products', '/v1/rules-faq', '/v1/rules-faq/categories', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
+  return json({ error: 'Not found', endpoints: ['/v1/cards', '/v1/cards/:id', '/v1/products', '/v1/products/:id', '/v1/sets', '/v1/sets/:code/cards', '/v1/sets/:code/products', '/v1/rules-faq', '/v1/rules-faq/categories', '/v1/errata', '/v1/bulk', '/v1/manifest', '/v1/me', '/register', '/docs', '/openapi.json'], docs: `${url.origin}/docs` }, 404);
 }
 
 // ---- OpenAPI 3 spec (served at /openapi.json). Kept in sync with route() by hand. ----
@@ -701,8 +717,18 @@ function openapiSpec(url) {
       '/v1/rules-faq/categories': {
         get: { tags: ['rules-faq'], summary: 'Distinct rule-FAQ categories with entry counts', responses: { '200': { description: 'Categories' } } }
       },
+      '/v1/errata': {
+        get: {
+          tags: ['errata'],
+          summary: 'Official card errata. Corrections are already applied to /v1/cards; this is the audit trail.',
+          parameters: [
+            { name: 'card_number', in: 'query', required: false, schema: { type: 'string' }, description: 'Filter to one card, e.g. GD04-067.' }
+          ],
+          responses: { '200': { description: 'Errata entries' } }
+        }
+      },
       '/v1/manifest': {
-        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, rule-FAQ count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
+        get: { tags: ['meta'], summary: 'Dataset version, card count, ruling count, rule-FAQ count, errata count, product count, bulk URL', responses: { '200': { description: 'Manifest' } } }
       },
       '/v1/me': {
         get: { tags: ['keys'], summary: 'Your API key status, tier, limit, and usage (today / 7d / 30d). Send X-API-Key (or Authorization: Bearer); response is never cached.', responses: { '200': { description: 'Key status + usage (keyed), or anon tier info' } } }
@@ -746,6 +772,7 @@ function docsPage(url) {
     ['products', 'Products'],
     ['rulings', 'Rulings'],
     ['rules-faq', 'Rule FAQ'],
+    ['errata', 'Errata'],
     ['bulk', 'Bulk download'],
     ['caching', 'Caching &amp; CORS'],
     ['license', 'License &amp; attribution']
@@ -841,7 +868,8 @@ function docsPage(url) {
     <tr><td><span class="pill">GET</span><code>/v1/sets/{code}/products</code></td><td>All products for a set code, e.g. <code>GD06</code>. Unpaginated.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/rules-faq</code></td><td>Rule-level official FAQ (mechanics, keywords, phases) with answers. <code>?category=</code>, <code>?q=</code>.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/rules-faq/categories</code></td><td>Distinct rule-FAQ categories with entry counts.</td></tr>
-    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, rule-FAQ count, product count, bulk URL.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/errata</code></td><td>Official card errata. Corrections are <b>already applied</b> to <code>/v1/cards</code>; this is the audit trail. <code>?card_number=</code>.</td></tr>
+    <tr><td><span class="pill">GET</span><code>/v1/manifest</code></td><td>Dataset version, card count, ruling count, rule-FAQ count, errata count, product count, bulk URL.</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/bulk</code></td><td>302 redirect to the full NDJSON dataset (GitHub Release).</td></tr>
     <tr><td><span class="pill">GET</span><code>/v1/me</code></td><td>Your key status, tier, limit, and usage today/7d/30d (send <code>X-API-Key</code>; never cached).</td></tr>
     <tr><td><span class="pill">GET</span><code>/register</code></td><td>Self-serve free API key (browser challenge).</td></tr>
@@ -1000,6 +1028,27 @@ curl "${base}/v1/sets/GD06/products"</pre>
   <p class="muted">Bandai's FAQ pages remain the authority - every entry carries the <code>source_url</code> it came from.</p>
   </section>
 
+  <section id="errata">
+  <h2>Errata <a class="anchor" href="#errata" aria-label="Link to this section">#</a></h2>
+  <p><b>Card text served by this API is post-errata.</b> Bandai does not update its card detail pages when it issues a correction, so a plain scrape of the official card database is wrong for errata'd cards. This API applies the official corrections to <code>/v1/cards</code> and publishes this ledger so you can see exactly what was changed and on whose authority.</p>
+  <p>Errata is announced only in prose news posts with no index, so the list is <b>curated by hand</b> in <code>src/errata.js</code> rather than scraped. Each import re-verifies every entry against the freshly scraped text and <b>fails the build</b> if a correction no longer matches what it claims to correct.</p>
+  <pre>curl "${base}/v1/errata"
+
+"data": [
+  {
+    "card_number": "T-013",
+    "name": "Hy-Gogg",
+    "field": "trait",
+    "before": "(Zeon)",
+    "after": "(Cyclops Team)",
+    "date": "2026-01-30",
+    "source_url": "https://www.gundam-gcg.com/en/news/01_204.html",
+    "status": "applied"
+  }
+]</pre>
+  <p class="muted">Note that errata is not limited to <code>effect</code> text - the example above corrects a <code>trait</code>, which changes what trait-based effects can target. If you are building anything rules-accurate, use these fields rather than assuming the printed card is authoritative. Found an errata we are missing? Open an issue.</p>
+  </section>
+
   <section id="bulk">
   <h2>Bulk download <a class="anchor" href="#bulk" aria-label="Link to this section">#</a></h2>
   <p>The full dataset is a single newline-delimited JSON file, always current, on the GitHub Release:</p>
@@ -1065,6 +1114,19 @@ async function cardCount(env) {
   if (!Number.isNaN(n)) return n;
   const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM cards`).first();
   return c ? c.n : 0;
+}
+
+// Static errata count from meta. Written unconditionally by gen-sql (errata is critical-path,
+// so the count is always accurate, including a legitimate 0). Table may be absent on a DB that
+// has not been imported since errata shipped, so the fallback is wrapped.
+async function errataCount(env) {
+  const row = await env.DB.prepare(`SELECT value FROM meta WHERE key = 'errata_count'`).first();
+  const n = row ? parseInt(row.value, 10) : NaN;
+  if (!Number.isNaN(n)) return n;
+  try {
+    const c = await env.DB.prepare(`SELECT COUNT(*) AS n FROM errata`).first();
+    return c ? c.n : 0;
+  } catch (_) { return 0; }
 }
 
 // Static rule-FAQ count from meta (written by the weekly import); falls back to COUNT(*).

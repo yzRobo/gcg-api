@@ -47,6 +47,10 @@ const products = fs.existsSync(productsPath) ? JSON.parse(fs.readFileSync(produc
 // leave the existing rules_faq table alone rather than emit a bare DELETE/DROP.
 const rulesFaqPath = path.join(__dirname,'..','data','rules-faq.json');
 const rulesFaq = fs.existsSync(rulesFaqPath) ? JSON.parse(fs.readFileSync(rulesFaqPath,'utf8')) : [];
+// Errata is CRITICAL-path (cli.js throws rather than writing a partial file), so unlike
+// products/rules-faq it needs no zero-guard: an empty file genuinely means zero errata.
+const errataPath = path.join(__dirname,'..','data','errata.json');
+const errata = fs.existsSync(errataPath) ? JSON.parse(fs.readFileSync(errataPath,'utf8')) : [];
 const metaRows = [
   ['dataset_version', process.env.DATASET_VERSION || new Date().toISOString().slice(0,10)],
   ['card_count', String(cards.length)],
@@ -56,6 +60,7 @@ const metaRows = [
 // rules_faq_count backs /v1/manifest. Written only when entries exist, consistent with the
 // product_count guard below (the ruling_count lesson: a manifest claim must be backed by a row).
 if (rulesFaq.length > 0) metaRows.push(['rules_faq_count', String(rulesFaq.length)]);
+metaRows.push(['errata_count', String(errata.length)]);   // unconditional: critical-path, always accurate
 // product_count meta backs /v1/manifest (the ruling_count lesson: the manifest claim must be
 // backed by a meta row). Only written when products exist, to stay consistent with the guard
 // below that leaves the products table untouched on an empty file.
@@ -76,6 +81,24 @@ for (let i = 0; i < rulings.length; i += 100) {
   sql += `INSERT INTO rulings (${rcols.join(',')}) VALUES\n` +
     chunk.map(r => `(${rcols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
 }
+// Errata table (separate; audit trail - the corrections are already baked into `cards`).
+// Unconditional DROP+CREATE like rulings: errata.json is produced by a CRITICAL gate that
+// throws rather than emitting a partial file, so an empty file means genuinely zero errata.
+// `before`/`after` are reserved-ish words in SQL, hence the _text column names.
+{
+  const ecols = ['card_number','name','field','before_text','after_text','date','source_url','note','status','printings_affected'];
+  sql += 'DROP TABLE IF EXISTS errata;\n';
+  sql += `CREATE TABLE errata (\n  card_number        TEXT,\n  name               TEXT,\n  field              TEXT,\n  before_text        TEXT,\n  after_text         TEXT,\n  date               TEXT,\n  source_url         TEXT,\n  note               TEXT,\n  status             TEXT,\n  printings_affected INTEGER\n);\n`;
+  sql += 'CREATE INDEX IF NOT EXISTS idx_errata_card ON errata(card_number);\n';
+  const rowOf = (e) => ({ ...e, before_text: e.before, after_text: e.after });
+  for (let i = 0; i < errata.length; i += 100) {
+    const chunk = errata.slice(i, i + 100).map(rowOf);
+    if (!chunk.length) break;
+    sql += `INSERT INTO errata (${ecols.join(',')}) VALUES\n` +
+      chunk.map(r => `(${ecols.map(k => esc(r[k])).join(',')})`).join(',\n') + ';\n';
+  }
+}
+
 // Rule-level FAQ table (separate; supplementary, replaced wholesale each run). Guarded on
 // rulesFaq.length > 0 so an empty/missing rules-faq.json never wipes the table. DROP+CREATE
 // keeps the shape in sync with schema.sql without a hand-run ALTER.
@@ -107,4 +130,4 @@ if (products.length > 0) {
 // the import - like api_keys - so keys and their history persist across weekly refreshes).
 sql += "DELETE FROM usage_daily WHERE day < date('now','-35 day');\n";
 fs.writeFileSync(path.join(__dirname,'..','data','import.sql'), sql);
-console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings, ${rulesFaq.length} rule FAQ, ${products.length} products)`);
+console.log(`Wrote import.sql (${cards.length} rows, ${setsSummary.length} sets, ${rulings.length} rulings, ${rulesFaq.length} rule FAQ, ${errata.length} errata, ${products.length} products)`);

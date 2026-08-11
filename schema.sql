@@ -99,6 +99,25 @@ CREATE TABLE IF NOT EXISTS rules_faq (
 );
 CREATE INDEX IF NOT EXISTS idx_rules_faq_category ON rules_faq(category);
 
+-- Official card errata (added 2026-08-11). Hand-curated in src/errata.js, NOT scraped:
+-- Bandai does not update card detail pages when it issues errata, and publishes them only
+-- as prose news announcements with no index. The corrections are ALREADY APPLIED to the
+-- cards table, so `effect`/`trait` there are post-errata; this table is the audit trail.
+-- Replaced wholesale each import via DROP+CREATE, like rulings.
+CREATE TABLE IF NOT EXISTS errata (
+  card_number        TEXT,
+  name               TEXT,
+  field              TEXT,
+  before_text        TEXT,
+  after_text         TEXT,
+  date               TEXT,
+  source_url         TEXT,
+  note               TEXT,
+  status             TEXT,
+  printings_affected INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_errata_card ON errata(card_number);
+
 -- Per-key daily usage counters (M5+ /v1/me). Incremented fire-and-forget on KEYED requests
 -- only (anonymous traffic is never tracked: privacy + trivial D1 write volume). NEVER rewritten
 -- by the weekly import (same rule as api_keys); gen-sql only appends a 35-day prune.
