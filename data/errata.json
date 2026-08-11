@@ -1,0 +1,26 @@
+[
+ {
+  "card_number": "T-013",
+  "name": "Hy-Gogg",
+  "field": "trait",
+  "before": "(Zeon)",
+  "after": "(Cyclops Team)",
+  "date": "2026-01-30",
+  "source_url": "https://www.gundam-gcg.com/en/news/01_204.html",
+  "note": "Steel Requiem [GD03]. The trait printed as (Zeon) is treated as (Cyclops Team). Affects trait-based targeting, not effect text.",
+  "status": "applied",
+  "printings_affected": 1
+ },
+ {
+  "card_number": "GD04-067",
+  "name": "∀ Gundam",
+  "field": "effect",
+  "before": "from your trash",
+  "after": "from any player's trash",
+  "date": "2026-04-10",
+  "source_url": "https://www.gundam-gcg.com/en/news/02_157.html",
+  "note": "Phantom Aria [GD04]. Widens the eligible trash from the controller to either player.",
+  "status": "applied",
+  "printings_affected": 2
+ }
+]
