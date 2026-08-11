@@ -5,9 +5,16 @@ const GundamScraper = require('./scraper');
 const { normalizeCard } = require('./normalize');
 const { assertScrapingAllowed } = require('./robots'); // rider 3: robots.txt precheck
 const { applyErrataToRaw, finalizeErrata } = require('./errata'); // official card corrections
+const { buildSetIndex } = require('./sets'); // the ONE definition of a set (see src/sets.js)
 
 const OUT = path.join(__dirname, '..', 'data');
 const VERSION = process.env.DATASET_VERSION || new Date().toISOString().slice(0, 10); // set in CI
+// The commit whose CODE produced this dataset. NOT the commit that CONTAINS it: this file is
+// written before the refresh workflow commits it, and a commit cannot carry its own sha. The
+// sha embedded in dataset_version is this one, so anyone pinning bytes by it silently gets the
+// PREVIOUS dataset. Named explicitly here so the meaning is unambiguous in the data itself;
+// see the "Pinning an exact snapshot" section of the README for how to pin correctly.
+const SOURCE_COMMIT = process.env.GITHUB_SHA || (VERSION.includes('-') ? VERSION.slice(VERSION.indexOf('-') + 1) : null);
 
 async function main() {
   const scraper = new GundamScraper();
@@ -22,7 +29,6 @@ async function main() {
   const byId = new Map();
   const rulingsByKey = new Map();
   const errataTally = new Map();   // errata entry -> { applied, upstream_fixed, miss, samples }
-  const setIndex = [];
   for (const pkg of packages) {
     const raw = await scraper.scrapePackage(pkg, {
       onProgress: (d, t) => process.stdout.write(`\r  ${pkg.code || pkg.name}: ${d}/${t}   `)
@@ -45,10 +51,17 @@ async function main() {
         if (!rulingsByKey.has(key)) rulingsByKey.set(key, { card_number: rc.card_number, num: r.num, date: r.date, question: r.question, answer: r.answer || '', source_url: rc.detail_url });
       }
     }
-    setIndex.push({ set_code: pkg.code || null, set_name: pkg.name.replace(/\s*\[[^\]]*\]\s*$/, '').trim(), card_count: count });
+    // Previously this count fed the per-package set index. The index is now derived from
+    // the cards (src/sets.js), so keep it as a log line: it shows what each package
+    // actually contributed, which is the first thing you want when a scrape looks short.
+    console.log(`  ${pkg.code || pkg.name}: +${count} new printings`);
   }
 
   const cards = [...byId.values()];
+  // Derived from the CARDS, not from the scraped packages. See src/sets.js for why:
+  // the package taxonomy and the card set_code taxonomy disagree, and only the latter
+  // makes set_code a real key. This is a PRINTING index; card_count counts printings.
+  const setIndex = buildSetIndex(cards);
   const rulings = [...rulingsByKey.values()];
 
   // ---- SANITY GATE (abort before writing anything if these fail) ----
@@ -190,6 +203,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({
     schema_version: 1,
     dataset_version: VERSION,
+    source_commit: SOURCE_COMMIT,   // the commit whose CODE built this; see README "Pinning an exact snapshot"
     built_at: new Date().toISOString(),
     card_count: cards.length,
     set_count: setIndex.length,

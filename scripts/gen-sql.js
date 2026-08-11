@@ -1,6 +1,7 @@
 // scripts/gen-sql.js - generate data/import.sql from data/cards.ndjson
 const fs = require('fs');
 const path = require('path');
+const { buildSetIndex } = require('../src/sets');
 const cards = fs.readFileSync(path.join(__dirname,'..','data','cards.ndjson'),'utf8').trim().split('\n').map(JSON.parse);
 const cols = ['product_id','card_number','name','set_code','set_name','rarity','card_type','color','level','cost','ap','hp','zone','trait','link','source_title','block_icon','sp','effect','image_url','detail_url','ap_raw','hp_raw','where_to_get','traits','link_refs','keyword_effects','timing_markers','keywords_text'];
 const JSON_COLS = new Set(['traits','link_refs','keyword_effects','timing_markers']); // stored as JSON-in-TEXT
@@ -14,28 +15,14 @@ for (let i = 0; i < cards.length; i += 40) {                     // 40 rows per 
 }
 // Precomputed summaries so /v1/manifest and /v1/sets are O(1) meta reads instead of
 // full-table COUNT/GROUP BY scans on every cache miss (D1 free-tier read-budget guard).
-const setMap = new Map(); // set_code -> { set_code, names: Map<name,count>, card_count }
-for (const c of cards) {
-  const code = c.set_code == null ? '' : String(c.set_code);
-  const cur = setMap.get(code) || { set_code: code, names: new Map(), card_count: 0 };
-  cur.card_count++;
-  const sn = c.set_name == null ? '' : String(c.set_name);
-  cur.names.set(sn, (cur.names.get(sn) || 0) + 1);
-  setMap.set(code, cur);
-}
 // Canonical set_name = the MOST COMMON name for that set_code. A set_code (e.g. GD01)
 // contains its main-package cards (set_name "Newtype Rising") plus promo cards that share
 // the GD01-### numbering but carry the generic promo package name ("Promotion card").
 // The main package always dominates by count, so mode picks the real name - unlike SQL
 // MAX(set_name), which wrongly picks "Promotion card" for sets whose name sorts before it.
-// Tie-break: lexicographically smallest.
-const setsSummary = [...setMap.values()].map(s => {
-  let best = null, bestCount = -1;
-  for (const [name, cnt] of s.names) {
-    if (cnt > bestCount || (cnt === bestCount && (best === null || name < best))) { best = name; bestCount = cnt; }
-  }
-  return { set_code: s.set_code, set_name: best == null ? '' : best, card_count: s.card_count };
-}).sort((a, b) => a.set_code < b.set_code ? -1 : a.set_code > b.set_code ? 1 : 0);
+// Shared with cli.js via src/sets.js so the published index and this summary CANNOT drift
+// apart again - two separate implementations is what produced the null-set_code bug.
+const setsSummary = buildSetIndex(cards);
 const rulingsPath = path.join(__dirname,'..','data','rulings.json');
 const rulings = fs.existsSync(rulingsPath) ? JSON.parse(fs.readFileSync(rulingsPath,'utf8')) : [];
 // Products are SUPPLEMENTARY: an absent/empty products.json must NOT wipe the D1 products

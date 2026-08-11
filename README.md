@@ -46,6 +46,40 @@ curl "https://api.gcgapi.com/v1/sets"
 **The files are the source of truth; the API is a convenience over them.** If the API is ever
 retired, the dataset still lives in the repo and Releases - nobody is stranded.
 
+### Pinning an exact snapshot
+
+If you need a reproducible build, pin to a commit rather than tracking `main`. One trap to
+know about first:
+
+> `dataset_version` looks like `18-80c9cfa…`. The sha in it is the commit whose **code
+> produced** the data, **not** the commit that **contains** it. The refresh workflow builds
+> the files and *then* commits them, and a commit cannot carry its own sha. Pinning by the
+> sha inside `dataset_version` silently gives you the **previous** dataset, which looks
+> perfectly valid.
+
+The same sha is published as `source_commit` in `manifest.json`, named for what it is.
+
+**To pin the actual bytes**, use the run number - the first part of `dataset_version` - and
+find the data commit, whose message is always `data: weekly refresh (run N)`:
+
+```bash
+# what run am I on?
+curl -s https://api.gcgapi.com/v1/manifest | grep -o '"dataset_version":"[^"]*"'
+#   -> "dataset_version":"18-80c9cfa..."   (run 18)
+
+# the commit that CONTAINS run 18's data
+git log --format=%H --grep='weekly refresh (run 18)' -1
+#   -> e5c5642e8551e25794274adb749bcae090bd2bae
+
+curl -L "https://raw.githubusercontent.com/yzRobo/gcg-api/e5c5642.../data/cards.json"
+```
+
+Run numbers can have gaps: a cancelled run, or one that produced no data changes, leaves no
+commit. Always resolve the commit rather than assuming run `N` exists.
+
+For "just give me current", the `data-latest` Release is replaced on every publish and needs
+no pinning at all.
+
 ---
 
 ## Rate limits & API keys
