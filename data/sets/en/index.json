@@ -12,7 +12,7 @@
   {
     "set_code": "EXBP",
     "set_name": "Promotion card",
-    "card_count": 18
+    "card_count": 23
   },
   {
     "set_code": "EXR",
@@ -22,12 +22,12 @@
   {
     "set_code": "EXRP",
     "set_name": "Other Product Card",
-    "card_count": 14
+    "card_count": 16
   },
   {
     "set_code": "GD01",
     "set_name": "Newtype Rising",
-    "card_count": 250
+    "card_count": 254
   },
   {
     "set_code": "GD02",
@@ -37,17 +37,17 @@
   {
     "set_code": "GD03",
     "set_name": "Steel Requiem",
-    "card_count": 241
+    "card_count": 242
   },
   {
     "set_code": "GD04",
     "set_name": "Phantom Aria",
-    "card_count": 200
+    "card_count": 205
   },
   {
     "set_code": "GD05",
     "set_name": "Freedom Ascension",
-    "card_count": 199
+    "card_count": 203
   },
   {
     "set_code": "R",
@@ -77,12 +77,12 @@
   {
     "set_code": "ST03",
     "set_name": "Zeon's Rush",
-    "card_count": 43
+    "card_count": 46
   },
   {
     "set_code": "ST04",
     "set_name": "SEED Strike",
-    "card_count": 49
+    "card_count": 50
   },
   {
     "set_code": "ST05",
@@ -117,6 +117,6 @@
   {
     "set_code": "T",
     "set_name": "Other Product Card",
-    "card_count": 10
+    "card_count": 15
   }
 ]

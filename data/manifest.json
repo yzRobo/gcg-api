@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "dataset_version": "21-b5dc4c08fcb33085c3eea2dce70c1d19ebe859af",
-  "source_commit": "b5dc4c08fcb33085c3eea2dce70c1d19ebe859af",
-  "built_at": "2026-08-24T07:02:35.356Z",
-  "card_count": 1816,
+  "dataset_version": "22-176e6e816d7ed569cef8bd311ac6f5d6e059f117",
+  "source_commit": "176e6e816d7ed569cef8bd311ac6f5d6e059f117",
+  "built_at": "2026-08-31T12:53:40.414Z",
+  "card_count": 1846,
   "set_count": 24,
   "ruling_count": 308,
   "rules_faq_count": 117,
