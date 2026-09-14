@@ -115,6 +115,26 @@
     "card_count": 35
   },
   {
+    "set_code": "ST11",
+    "set_name": "Aquatic Assault",
+    "card_count": 17
+  },
+  {
+    "set_code": "ST12",
+    "set_name": "Raging Onslaught",
+    "card_count": 16
+  },
+  {
+    "set_code": "ST13",
+    "set_name": "Silent Barrage",
+    "card_count": 17
+  },
+  {
+    "set_code": "ST14",
+    "set_name": "Heavy Dominion",
+    "card_count": 16
+  },
+  {
     "set_code": "T",
     "set_name": "Other Product Card",
     "card_count": 15
