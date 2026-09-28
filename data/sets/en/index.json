@@ -12,7 +12,7 @@
   {
     "set_code": "EXBP",
     "set_name": "Promotion card",
-    "card_count": 23
+    "card_count": 24
   },
   {
     "set_code": "EXR",
@@ -22,12 +22,12 @@
   {
     "set_code": "EXRP",
     "set_name": "Other Product Card",
-    "card_count": 16
+    "card_count": 18
   },
   {
     "set_code": "GD01",
     "set_name": "Newtype Rising",
-    "card_count": 254
+    "card_count": 257
   },
   {
     "set_code": "GD02",
@@ -42,12 +42,12 @@
   {
     "set_code": "GD04",
     "set_name": "Phantom Aria",
-    "card_count": 205
+    "card_count": 210
   },
   {
     "set_code": "GD05",
     "set_name": "Freedom Ascension",
-    "card_count": 203
+    "card_count": 213
   },
   {
     "set_code": "R",
@@ -57,7 +57,7 @@
   {
     "set_code": "RP",
     "set_name": "Promotion card",
-    "card_count": 66
+    "card_count": 68
   },
   {
     "set_code": "SC01",
@@ -77,7 +77,7 @@
   {
     "set_code": "ST03",
     "set_name": "Zeon's Rush",
-    "card_count": 46
+    "card_count": 49
   },
   {
     "set_code": "ST04",
@@ -97,7 +97,7 @@
   {
     "set_code": "ST07",
     "set_name": "Celestial Drive",
-    "card_count": 40
+    "card_count": 41
   },
   {
     "set_code": "ST08",
@@ -107,7 +107,7 @@
   {
     "set_code": "ST09",
     "set_name": "Destiny Ignition",
-    "card_count": 39
+    "card_count": 41
   },
   {
     "set_code": "ST10",
@@ -117,26 +117,26 @@
   {
     "set_code": "ST11",
     "set_name": "Aquatic Assault",
-    "card_count": 17
+    "card_count": 35
   },
   {
     "set_code": "ST12",
     "set_name": "Raging Onslaught",
-    "card_count": 16
+    "card_count": 34
   },
   {
     "set_code": "ST13",
     "set_name": "Silent Barrage",
-    "card_count": 17
+    "card_count": 33
   },
   {
     "set_code": "ST14",
     "set_name": "Heavy Dominion",
-    "card_count": 16
+    "card_count": 32
   },
   {
     "set_code": "T",
-    "set_name": "Other Product Card",
-    "card_count": 15
+    "set_name": "Promotion card",
+    "card_count": 17
   }
 ]
