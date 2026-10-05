@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "dataset_version": "26-f57b7c0b0ebc4c13d359649de19750c793ecbefc",
-  "source_commit": "f57b7c0b0ebc4c13d359649de19750c793ecbefc",
-  "built_at": "2026-09-28T13:06:37.296Z",
+  "dataset_version": "27-aaab8f119cf51c2b72e1656244d04f2d83a45955",
+  "source_commit": "aaab8f119cf51c2b72e1656244d04f2d83a45955",
+  "built_at": "2026-10-05T13:49:12.935Z",
   "card_count": 2011,
   "set_count": 28,
   "ruling_count": 368,
