@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "dataset_version": "31-ebd08a4b4f8c8898bc407498229839548fb911e9",
-  "source_commit": "ebd08a4b4f8c8898bc407498229839548fb911e9",
-  "built_at": "2026-11-02T14:57:40.351Z",
+  "dataset_version": "32-78a64df3519cb6c773b3d2f4a8ecad14d8096b0e",
+  "source_commit": "78a64df3519cb6c773b3d2f4a8ecad14d8096b0e",
+  "built_at": "2026-11-09T15:24:40.757Z",
   "card_count": 2205,
   "set_count": 29,
   "ruling_count": 437,
   "rules_faq_count": 119,
   "errata_count": 2,
-  "product_count": 53,
+  "product_count": 54,
   "files": {
     "bulk_ndjson": "data/cards.ndjson",
     "bulk_json": "data/cards.json",

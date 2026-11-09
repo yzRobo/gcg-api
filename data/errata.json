@@ -20,7 +20,7 @@
   "date": "2026-04-10",
   "source_url": "https://www.gundam-gcg.com/en/news/02_157.html",
   "note": "Phantom Aria [GD04]. Widens the eligible trash from the controller to either player.",
-  "status": "applied",
+  "status": "upstream_fixed",
   "printings_affected": 2
  }
 ]
